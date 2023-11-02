@@ -1,0 +1,8 @@
+{
+    "rust-analyzer.checkOnSave.allTargets": false,
+    "rust-analyzer.imports.prefer.no.std": true,
+    "rust-analyzer.lens.references.adt.enable": true,
+    "rust-analyzer.lens.references.method.enable": true,
+    "rust-analyzer.lens.references.trait.enable": true,
+    "rust-analyzer.lru.capacity": 1024,
+}
