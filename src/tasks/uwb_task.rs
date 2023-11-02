@@ -2,7 +2,7 @@ use dw3000::{self, hl::ConfigGPIOs};
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::digital::Wait;
 use hal::{
-    gpio::{Floating, GpioPin, Input, Output, PullDown, PushPull},
+    gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
     prelude::*,
     spi::{master::Spi, FullDuplexMode},
@@ -90,29 +90,6 @@ pub async fn uwb_task(
             }
         }
         dw3000 = sending.finish_sending().expect("Failed to finish sending.");
-
-        // Get GPIO clock status
-        let clk_ctrl_data = dw3000.ll().clk_ctrl().read().unwrap();
-        log::info!(
-            "clk_ctrl: {:}, {:}, {:}, {:}",
-            clk_ctrl_data.gpio_clk_en(),
-            clk_ctrl_data.gpio_dclk_en(),
-            clk_ctrl_data.gpio_drst_n(),
-            clk_ctrl_data.lp_clk_en()
-        );
-
-        // Get led_ctrl status
-        let led_ctrl_data = dw3000.ll().led_ctrl().read().unwrap();
-        log::info!(
-            "led_ctrl: {:}, {:}, {:}",
-            led_ctrl_data.blink_en(),
-            led_ctrl_data.blink_tim(),
-            led_ctrl_data.force_trig()
-        );
-
-        // Read LP_CLK_DIV
-        let lp_clk_div_data = dw3000.ll().seq_ctrl().read().unwrap();
-        log::info!("lp_clk_div: {:}", lp_clk_div_data.lp_clk_div());
 
         Timer::after(Duration::from_millis(1200)).await;
     }

@@ -70,7 +70,8 @@ async fn main(spawner: Spawner) -> ! {
 
     let peripherals = Peripherals::take();
     let system = peripherals.SYSTEM.split();
-    let clocks = ClockControl::configure(system.clock_control, hal::clock::CpuClock::Clock240MHz).freeze();
+    let clocks =
+        ClockControl::configure(system.clock_control, hal::clock::CpuClock::Clock240MHz).freeze();
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     interrupt::enable(Interrupt::GPIO, interrupt::Priority::Priority1).unwrap();
@@ -107,7 +108,7 @@ async fn main(spawner: Spawner) -> ! {
     // DW3000 Interrupt
     let mut int_dw3000 = io.pins.gpio15.into_pull_down_input();
     int_dw3000.internal_pull_down(true);
-    
+
     int_dw3000.listen(hal::gpio::Event::HighLevel);
 
     let cs_dw3000 = io.pins.gpio8.into_push_pull_output();
@@ -118,7 +119,9 @@ async fn main(spawner: Spawner) -> ! {
         let spawner = INT_EXECUTOR_CORE_1.start(interrupt::Priority::Priority1);
 
         spawner
-            .spawn(tasks::uwb_task(dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000))
+            .spawn(tasks::uwb_task(
+                dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000,
+            ))
             .ok();
 
         // Just loop to show that the main thread does not need to poll the executor.
