@@ -692,12 +692,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
+name = "lsm6dso"
+version = "0.1.0"
+dependencies = [
+ "embedded-hal 0.2.7",
+]
+
+[[package]]
 name = "magic-loc-rs"
 version = "0.1.0"
 dependencies = [
  "dw3000",
  "embassy-executor",
  "embassy-time",
+ "embedded-hal 0.2.7",
  "embedded-hal-async",
  "embedded-io 0.4.0",
  "embedded-svc",
@@ -707,6 +715,7 @@ dependencies = [
  "esp32s3-hal",
  "heapless",
  "log",
+ "lsm6dso",
  "smoltcp",
 ]
 

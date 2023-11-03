@@ -1,8 +1,8 @@
-use dw3000::{self, hl::ConfigGPIOs};
+use dw3000::{self};
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::digital::Wait;
 use hal::{
-    gpio::{Floating, GpioPin, Input, Output, PullDown, PushPull},
+    gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
     prelude::*,
     spi::{master::Spi, FullDuplexMode},

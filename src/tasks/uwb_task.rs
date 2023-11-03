@@ -43,7 +43,7 @@ pub async fn uwb_task(
     Timer::after(Duration::from_millis(200)).await;
 
     // Disable SPIRDY interrupt
-    dw3000.disable_spirdy_interrupt();
+    dw3000.disable_spirdy_interrupt().unwrap();
 
     dw3000.enable_tx_interrupts().unwrap();
 

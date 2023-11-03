@@ -19,7 +19,7 @@ use hal::{
     },
     i2c::I2C,
     interrupt,
-    peripherals::{Interrupt, Peripherals, I2C0, SPI2},
+    peripherals::{Interrupt, Peripherals, I2C0, SPI2, SPI3},
     prelude::*,
     spi::{FullDuplexMode, SpiMode},
     IO,
@@ -94,6 +94,20 @@ async fn main(spawner: Spawner) -> ! {
 
     spawner.spawn(battery_manager(i2c)).ok();
 
+    // IMU Task
+    let imu_spi: hal::spi::master::Spi<SPI3, FullDuplexMode> = hal::spi::master::Spi::new(
+        peripherals.SPI3,
+        io.pins.gpio33,
+        io.pins.gpio47,
+        io.pins.gpio26,
+        io.pins.gpio34,
+        30u32.MHz(),
+        SpiMode::Mode0,
+        &clocks,
+    );
+
+    spawner.spawn(tasks::imu_task(imu_spi)).ok();
+
     // DW3000 SPI
     let dw3000_spi: hal::spi::master::Spi<SPI2, FullDuplexMode> = hal::spi::master::Spi::new_no_cs(
         peripherals.SPI2,
@@ -140,47 +154,3 @@ async fn main(spawner: Spawner) -> ! {
         Timer::after(Duration::from_millis(1_000)).await;
     }
 }
-
-// #[entry]
-// fn main() -> ! {
-//     init_heap();
-//     let peripherals = Peripherals::take();
-//     let mut system = peripherals.SYSTEM.split();
-//     let clocks = ClockControl::max(system.clock_control).freeze();
-
-//     // setup logger
-//     // To change the log_level change the env section in .cargo/config.toml
-//     // or remove it and set ESP_LOGLEVEL manually before running cargo run
-//     // this requires a clean rebuild because of https://github.com/rust-lang/cargo/issues/10358
-//     esp_println::logger::init_logger_from_env();
-//     log::info!("Logger is setup");
-//     println!("Hello world!");
-//     let timer = TimerGroup::new(
-//         peripherals.TIMG1,
-//         &clocks,
-//         &mut system.peripheral_clock_control,
-//     )
-//     .timer0;
-//     let _init = initialize(
-//         EspWifiInitFor::Wifi,
-//         timer,
-//         Rng::new(peripherals.RNG),
-//         system.radio_clock_control,
-//         &clocks,
-//     )
-//     .unwrap();
-
-//     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-//     let mut led = io.pins.gpio7.into_push_pull_output();
-
-//     led.set_high().unwrap();
-
-//     // Initialize the Delay peripheral, and use it to toggle the LED state in a
-//     // loop.
-//     let mut delay = Delay::new(&clocks);
-
-//     loop {
-//         led.toggle().unwrap();
-//         delay.delay_ms(500u32);
-//     }
-// }
