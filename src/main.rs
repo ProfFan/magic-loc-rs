@@ -82,7 +82,7 @@ async fn load_config() -> Option<config::MagicLocConfig> {
     let mut storage = FlashStorage::new();
     log::info!("Flash size = {}", storage.capacity());
 
-    let mut buf = [0u8; 512];
+    let mut buf = [0u8; core::mem::size_of::<MagicLocConfig>()];
 
     return storage
         .read(NVS_ADDR, &mut buf)
@@ -103,14 +103,30 @@ async fn load_config() -> Option<config::MagicLocConfig> {
             let config = MagicLocConfig::default();
 
             // save to flash
-            let mut buf = [0u8; 512];
-            let buf = postcard::to_slice_cobs(&config, &mut buf).unwrap();
+            let mut buf = [0u8; core::mem::size_of::<MagicLocConfig>()];
+            let buf = postcard::to_slice(&config, &mut buf).unwrap();
 
             storage.write(NVS_ADDR, buf).unwrap();
+
+            log::info!("Saved default config!");
 
             return Ok(config);
         })
         .ok();
+}
+
+async fn write_config(config: &MagicLocConfig) -> Result<(), ()> {
+    let mut storage = FlashStorage::new();
+
+    // save to flash
+    let mut buf = [0u8; core::mem::size_of::<MagicLocConfig>()];
+    let buf = postcard::to_slice(config, &mut buf).map_err(|_| ())?;
+
+    storage.write(NVS_ADDR, buf).map_err(|_| ())?;
+
+    log::info!("Saved config!");
+
+    return Ok(());
 }
 
 #[embassy_executor::task]
@@ -121,13 +137,12 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     let system = peripherals.SYSTEM.split();
 
     // Load config from flash
-    let config = load_config().await;
+    let mut config = load_config().await.unwrap();
 
-    if let Some(config) = config {
-        log::info!("Config: {:?}", config);
-    } else {
-        log::info!("No config found!");
-    }
+    // config.mode = config::Mode::Anchor;
+    // write_config(&config).await.unwrap();
+
+    log::info!("Config: {:?}", config);
 
     interrupt::enable(Interrupt::GPIO, interrupt::Priority::Priority2).unwrap();
 
@@ -162,25 +177,31 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     )
     .unwrap();
 
-    // IMU Task
-    let imu_spi = hal::spi::master::Spi::new(
-        peripherals.SPI3,
-        io.pins.gpio33,
-        io.pins.gpio47,
-        io.pins.gpio17,
-        io.pins.gpio34,
-        30u32.MHz(),
-        SpiMode::Mode0,
-        &clocks,
-    );
+    if config.mode == config::Mode::Tag {
+        log::info!("Mode = TAG, starting IMU");
 
-    // IMU INT
-    let int_imu = io.pins.gpio48.into_pull_down_input();
-    // int_imu.listen(hal::gpio::Event::HighLevel);
 
-    spawner
-        .spawn(tasks::imu_task(imu_spi, dma_channel, int_imu))
-        .ok();
+        let imu_spawner = INT_EXECUTOR_CORE_0.start(interrupt::Priority::Priority1);
+        // IMU Task
+        let imu_spi = hal::spi::master::Spi::new(
+            peripherals.SPI3,
+            io.pins.gpio33,
+            io.pins.gpio47,
+            io.pins.gpio17,
+            io.pins.gpio34,
+            30u32.MHz(),
+            SpiMode::Mode0,
+            &clocks,
+        );
+
+        // IMU INT
+        let int_imu = io.pins.gpio48.into_pull_down_input();
+        // int_imu.listen(hal::gpio::Event::HighLevel);
+
+        imu_spawner
+            .spawn(tasks::imu_task(imu_spi, dma_channel, int_imu))
+            .ok();
+    }
 
     // DW3000 SPI
     let dw3000_spi: hal::spi::master::Spi<SPI2, FullDuplexMode> = hal::spi::master::Spi::new_no_cs(
@@ -195,8 +216,6 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
 
     // DW3000 Interrupt
     let int_dw3000 = io.pins.gpio15.into_pull_down_input();
-    // int_dw3000.listen(hal::gpio::Event::HighLevel);
-
     let cs_dw3000 = io.pins.gpio8.into_push_pull_output();
     let rst_dw3000 = io.pins.gpio9.into_push_pull_output();
 
@@ -222,8 +241,8 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     }
 }
 
-#[entry]
-fn main() -> ! {
+#[main]
+async fn main(spawner: Spawner) -> ! {
     esp_println::println!("Init!");
     esp_println::logger::init_logger_from_env();
     init_heap();
@@ -238,9 +257,9 @@ fn main() -> ! {
         hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
     );
 
-    let spawner = INT_EXECUTOR_CORE_0.start(interrupt::Priority::Priority1);
-
     spawner.must_spawn(startup_task(clocks));
 
-    loop {}
+    loop {
+        Timer::after_secs(1).await;
+    }
 }

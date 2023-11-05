@@ -39,12 +39,21 @@ pub async fn imu_task(
         .await
         .unwrap();
 
-    log::info!("WHOAMI: {:0x}", recv_buf[1]);
+    log::info!("WHOAMI Async: {:0x}", recv_buf[1]);
 
     // Use the high level to read the WHOAMI register
     let whoami = imu.ll().who_am_i().read().unwrap();
 
     log::info!("WHOAMI: {:0x}", whoami.value());
+
+    // Assert that the WHOAMI register is correct
+    if whoami.value() != 0x6C {
+        log::error!("WHOAMI register is incorrect!");
+
+        loop {
+            Timer::after(Duration::from_millis(100)).await;
+        }
+    }
 
     // Reset the device
     imu.ll().ctrl3_c().modify(|_, w| w.sw_reset(0x1)).unwrap();
@@ -106,5 +115,15 @@ pub async fn imu_task(
         accel_data[0] = all_readouts.outx_a();
         accel_data[1] = all_readouts.outy_a();
         accel_data[2] = all_readouts.outz_a();
+
+        log::debug!(
+            "Gyro: {:} {:} {:}, Accel: {:} {:} {:}",
+            (gyro_data[0] as i16),
+            (gyro_data[1] as i16),
+            (gyro_data[2] as i16),
+            (accel_data[0] as i16),
+            (accel_data[1] as i16),
+            (accel_data[2] as i16)
+        );
     }
 }
