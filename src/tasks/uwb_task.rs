@@ -39,6 +39,11 @@ pub async fn uwb_task(
         .expect("Failed config.");
 
     dw3000.gpio_config(ConfigGPIOs::enable_led()).unwrap();
+    dw3000
+        .ll()
+        .led_ctrl()
+        .modify(|_, w| w.blink_tim(0x2))
+        .unwrap();
 
     Timer::after(Duration::from_millis(200)).await;
 

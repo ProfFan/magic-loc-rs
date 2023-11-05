@@ -2,24 +2,34 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+mod config;
 mod tasks;
 
 extern crate alloc;
+use config::MagicLocConfig;
 use core::mem::MaybeUninit;
 use embassy_executor::Spawner;
+
+use embedded_storage::{ReadStorage, Storage};
+use esp_storage::FlashStorage;
+use postcard::from_bytes;
+
+const NVS_ADDR: u32 = 0x9000;
 
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use hal::{
-    clock::ClockControl,
+    clock::{ClockControl, Clocks},
     cpu_control::{CpuControl, Stack},
     embassy::{
         self,
         executor::{FromCpu1, FromCpu2, InterruptExecutor},
     },
+    gdma::Gdma,
+    gpio::GpioPin,
     i2c::I2C,
     interrupt,
-    peripherals::{Interrupt, Peripherals, I2C0, SPI2, SPI3},
+    peripherals::{Interrupt, Peripherals, I2C0, SPI2},
     prelude::*,
     spi::{FullDuplexMode, SpiMode},
     IO,
@@ -56,32 +66,74 @@ fn init_heap() {
 }
 
 #[embassy_executor::task]
-async fn some_task() {
+async fn led_blinker(mut led: GpioPin<hal::gpio::Output<hal::gpio::PushPull>, 7>) -> ! {
     loop {
-        Timer::after(Duration::from_millis(1_000)).await;
+        led.set_high().unwrap();
+
+        loop {
+            led.toggle().unwrap();
+            Timer::after(Duration::from_millis(1_000)).await;
+        }
     }
 }
 
-#[main]
-async fn main(spawner: Spawner) -> ! {
-    esp_println::println!("Init!");
-    esp_println::logger::init_logger_from_env();
-    init_heap();
+/// Power-on configuration loader
+async fn load_config() -> Option<config::MagicLocConfig> {
+    let mut storage = FlashStorage::new();
+    log::info!("Flash size = {}", storage.capacity());
 
-    let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
-    let clocks =
-        ClockControl::configure(system.clock_control, hal::clock::CpuClock::Clock240MHz).freeze();
+    let mut buf = [0u8; 512];
+
+    return storage
+        .read(NVS_ADDR, &mut buf)
+        .map_err(|_| ())
+        .and_then(|_| -> Result<MagicLocConfig, ()> {
+            let config = from_bytes::<MagicLocConfig>(&buf);
+
+            if config.is_err() {
+                log::error!("Failed, reason {:?}", config.as_ref());
+                return Err(());
+            }
+
+            return config.map_err(|_| ());
+        })
+        .or_else(|_| -> Result<_, ()> {
+            log::info!("No config found!");
+            // Make default
+            let config = MagicLocConfig::default();
+
+            // save to flash
+            let mut buf = [0u8; 512];
+            let buf = postcard::to_slice_cobs(&config, &mut buf).unwrap();
+
+            storage.write(NVS_ADDR, buf).unwrap();
+
+            return Ok(config);
+        })
+        .ok();
+}
+
+#[embassy_executor::task]
+async fn startup_task(clocks: Clocks<'static>) -> ! {
+    let peripherals = unsafe { Peripherals::steal() };
+    let spawner = Spawner::for_current_executor().await;
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let system = peripherals.SYSTEM.split();
 
-    interrupt::enable(Interrupt::GPIO, interrupt::Priority::Priority1).unwrap();
+    // Load config from flash
+    let config = load_config().await;
 
-    embassy::init(
-        &clocks,
-        hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
-    );
+    if let Some(config) = config {
+        log::info!("Config: {:?}", config);
+    } else {
+        log::info!("No config found!");
+    }
 
-    spawner.spawn(some_task()).ok();
+    interrupt::enable(Interrupt::GPIO, interrupt::Priority::Priority2).unwrap();
+
+    let led = io.pins.gpio7.into_push_pull_output();
+
+    spawner.spawn(led_blinker(led)).ok();
 
     // 100kHz I2C clock for the SGM41511
     let i2c: I2C<I2C0> = hal::i2c::I2C::new(
@@ -94,19 +146,41 @@ async fn main(spawner: Spawner) -> ! {
 
     spawner.spawn(battery_manager(i2c)).ok();
 
+    // DMA
+    let dma = Gdma::new(peripherals.DMA);
+    let dma_channel = dma.channel0;
+
+    // Enable DMA interrupts
+    hal::interrupt::enable(
+        hal::peripherals::Interrupt::DMA_IN_CH0,
+        hal::interrupt::Priority::Priority2,
+    )
+    .unwrap();
+    hal::interrupt::enable(
+        hal::peripherals::Interrupt::DMA_OUT_CH0,
+        hal::interrupt::Priority::Priority2,
+    )
+    .unwrap();
+
     // IMU Task
-    let imu_spi: hal::spi::master::Spi<SPI3, FullDuplexMode> = hal::spi::master::Spi::new(
+    let imu_spi = hal::spi::master::Spi::new(
         peripherals.SPI3,
         io.pins.gpio33,
         io.pins.gpio47,
-        io.pins.gpio26,
+        io.pins.gpio17,
         io.pins.gpio34,
         30u32.MHz(),
         SpiMode::Mode0,
         &clocks,
     );
 
-    spawner.spawn(tasks::imu_task(imu_spi)).ok();
+    // IMU INT
+    let int_imu = io.pins.gpio48.into_pull_down_input();
+    // int_imu.listen(hal::gpio::Event::HighLevel);
+
+    spawner
+        .spawn(tasks::imu_task(imu_spi, dma_channel, int_imu))
+        .ok();
 
     // DW3000 SPI
     let dw3000_spi: hal::spi::master::Spi<SPI2, FullDuplexMode> = hal::spi::master::Spi::new_no_cs(
@@ -120,10 +194,8 @@ async fn main(spawner: Spawner) -> ! {
     );
 
     // DW3000 Interrupt
-    let mut int_dw3000 = io.pins.gpio15.into_pull_down_input();
-    int_dw3000.internal_pull_down(true);
-
-    int_dw3000.listen(hal::gpio::Event::HighLevel);
+    let int_dw3000 = io.pins.gpio15.into_pull_down_input();
+    // int_dw3000.listen(hal::gpio::Event::HighLevel);
 
     let cs_dw3000 = io.pins.gpio8.into_push_pull_output();
     let rst_dw3000 = io.pins.gpio9.into_push_pull_output();
@@ -145,12 +217,30 @@ async fn main(spawner: Spawner) -> ! {
         .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
         .unwrap();
 
-    let mut led = io.pins.gpio7.into_push_pull_output();
-
-    led.set_high().unwrap();
-
     loop {
-        led.toggle().unwrap();
         Timer::after(Duration::from_millis(1_000)).await;
     }
+}
+
+#[entry]
+fn main() -> ! {
+    esp_println::println!("Init!");
+    esp_println::logger::init_logger_from_env();
+    init_heap();
+
+    let peripherals = Peripherals::take();
+    let system = peripherals.SYSTEM.split();
+    let clocks =
+        ClockControl::configure(system.clock_control, hal::clock::CpuClock::Clock240MHz).freeze();
+
+    embassy::init(
+        &clocks,
+        hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
+    );
+
+    let spawner = INT_EXECUTOR_CORE_0.start(interrupt::Priority::Priority1);
+
+    spawner.must_spawn(startup_task(clocks));
+
+    loop {}
 }

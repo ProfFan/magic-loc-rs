@@ -502,6 +502,21 @@ macro_rules! impl_rw {
 
 impl_register! {
 
+    0x01, 1, RW, FUNC_CFG_ACCESS(func_cfg_access) { /// Embedded functions configuration register
+        not_used_01, 0, 5, u8;  /// Unused (0)
+        shub_reg_access, 6, 6, u8;  /// Enable access to external sensors via I²C master interface (default 0, disabled)
+        func_cfg_en,     7, 7, u8;  /// Enable embedded functions register bank (default 0, disabled)
+    }
+    0x0D, 1, RW, INT1_CTRL(int1_ctrl) { /// INT1 pin control register
+        int1_drdy_xl, 0, 0, u8;  /// Accelerometer data ready on INT1 (default 0, disabled)
+        int1_drdy_g,  1, 1, u8;  /// Gyroscope data ready on INT1 (default 0, disabled)
+        int1_boot,    2, 2, u8;  /// Boot status available on INT1 (default 0, disabled)
+        fifo_th,      3, 3, u8;  /// FIFO threshold interrupt on INT1 (default 0, disabled)
+        fifo_ovr,     4, 4, u8;  /// FIFO overrun interrupt on INT1 (default 0, disabled)
+        fifo_full,    5, 5, u8;  /// FIFO full interrupt on INT1 (default 0, disabled)
+        int1_cnt_bdr, 6, 6, u8;  /// Latched/pulsed interrupt (default 0, pulsed)
+        den_drdy_flag,7, 7, u8;  /// DEN data ready interrupt on INT1 (default 0, disabled)
+    }
     0x0F, 1, RO, WHO_AM_I(who_am_i) { /// Device identifier
         value,     0,  7, u8;  /// Value
     }
@@ -524,6 +539,16 @@ impl_register! {
         h_lactive,   5, 5, u8;  /// Interrupt activation level (default 0, active high)
         bdu,         6, 6, u8;  /// Block data update (default 0, continuous update)
         boot,        7, 7, u8;  /// Reboot memory content (default 0, normal mode)
+    }
+    0x13, 1, RW, CTRL4_C(ctrl4_c) { /// Control register 4
+        not_used_01, 0, 0, u8;  /// Unused (0)
+        lpf1_sel_g,  1, 1, u8;  /// LPF1 bandwidth selection (default 0, ODR/2)
+        i2c_disable, 2, 2, u8;  /// Disable I2C interface (default 0, I2C enabled)
+        drdy_mask,   3, 3, u8;  /// Data-ready pulsed/level sensitive (default 0, pulsed)
+        not_used_02, 4, 4, u8;  /// Unused (0)
+        int2_on_int1,5, 5, u8;  /// INT2 on INT1 (default 0, INT2 disabled)
+        sleep_g,     6, 6, u8;  /// Gyroscope sleep mode enable (default 0, disabled)
+        not_used_03, 7, 7, u8;  /// Unused (0)
     }
     0x20, 14, RO, ALL_READOUTS(all_readouts) { /// All readouts
         out_temp,  0, 15, u16;  /// Temperature output register
@@ -558,7 +583,6 @@ impl_register! {
     0x63, 1, RW, FREQ_FINE(freq_fine) { /// Fine frequency control register
         value, 0, 7, u8;  /// Fine frequency control
     }
-
 }
 
 /// Internal trait used by `impl_registers!`

@@ -6,9 +6,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [workspace]
-members = [
-    "lsm6dso"
-]
+members = ["lsm6dso"]
 
 [dependencies]
 # esp-wifi = { git = "https://github.com/esp-rs/esp-wifi/", branch = "main", features = [
@@ -19,10 +17,8 @@ members = [
 dw3000 = { package = "dw3000", git = "https://github.com/ProfFan/dw3000", branch = "RUST" }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
 
-
 hal = { package = "esp32s3-hal", git = "https://github.com/esp-rs/esp-hal", branch = "main", features = [
     "embassy",
-    "embassy-executor-thread",
     "embassy-executor-interrupt",
     "embassy-time-systick",
     "async",
@@ -41,6 +37,15 @@ esp-println = { version = "0.7.0", default-features = false, features = [
     "colors",
     "jtag_serial",
 ] }
+
+esp-storage = { version = "*", features = ["esp32s3"] }
+embedded-storage = "0.3.0"
+postcard = "1.0.0"
+
+# By default, `serde` has the `std` feature enabled, which makes it unsuitable for embedded targets
+# disabling default-features fixes this
+serde = { version = "1.0.*", default-features = false }
+
 log = { version = "0.4.18" }
 esp-alloc = { version = "0.3.0" }
 smoltcp = { version = "0.10.0", default-features = false, features = [
@@ -62,10 +67,13 @@ embassy-executor = { version = "0.3.0", features = ["nightly"] }
 
 embassy-time = { version = "0.1", features = ["nightly"] }
 
-[profile.dev.package.esp-wifi]
-opt-level = 3
+# [profile.dev.package.esp-wifi]
+# opt-level = 3
 
 [profile.dev.package.dw3000]
+opt-level = 3
+
+[profile.dev.package.esp-storage]
 opt-level = 3
 
 [profile.dev]

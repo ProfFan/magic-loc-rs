@@ -1,25 +1,45 @@
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::digital::Wait;
 use hal::{
-    gpio::{GpioPin, Input, Output, PullDown, PushPull},
+    gdma::ChannelCreator0,
+    gpio::{GpioPin, Input, PullDown},
     peripherals::SPI3,
-    prelude::*,
-    spi::{master::Spi, FullDuplexMode},
+    spi::{
+        master::{prelude::*, Spi},
+        FullDuplexMode,
+    },
 };
 
 use lsm6dso::LSM6DSO;
 
 #[embassy_executor::task]
-pub async fn imu_task(bus: Spi<'static, SPI3, FullDuplexMode>) -> ! {
+pub async fn imu_task(
+    bus: Spi<'static, SPI3, FullDuplexMode>,
+    dma_channel: ChannelCreator0,
+    mut int1: GpioPin<Input<PullDown>, 48>,
+) -> ! {
     log::info!("IMU Task Start!");
+
+    let mut descriptors = [0u32; 8 * 3];
+    let mut rx_descriptors = [0u32; 8 * 3];
+
+    let bus = bus.with_dma(dma_channel.configure(
+        false,
+        &mut descriptors,
+        &mut rx_descriptors,
+        hal::dma::DmaPriority::Priority0,
+    ));
 
     let mut imu = LSM6DSO::new(bus);
 
-    // SPI Transaction
-    let mut buf = [0x0F | 0x80, 0x00];
-    let result = imu.ll().spi_bus().transfer(&mut buf).unwrap();
+    // SPI Transaction with async
+    let send_buf = [0x0Fu8 | 0x80, 0x00];
+    let mut recv_buf = [0u8; 2];
+    embedded_hal_async::spi::SpiBus::transfer(&mut imu.ll().spi_bus(), &mut recv_buf, &send_buf)
+        .await
+        .unwrap();
 
-    log::info!("WHOAMI: {:0x}", result[1]);
+    log::info!("WHOAMI: {:0x}", recv_buf[1]);
 
     // Use the high level to read the WHOAMI register
     let whoami = imu.ll().who_am_i().read().unwrap();
@@ -61,7 +81,19 @@ pub async fn imu_task(bus: Spi<'static, SPI3, FullDuplexMode>) -> ! {
 
     log::info!("ODR Actual: {}", odr_actual);
 
+    // Set INT1 to DRDY_XL
+    imu.ll()
+        .int1_ctrl()
+        .modify(|_, w| w.int1_drdy_xl(1))
+        .unwrap();
+
+    // Read once to clear the interrupt
+    let _ = imu.ll().all_readouts().read().unwrap();
+
     loop {
+        // Wait for the interrupt
+        int1.wait_for_high().await.unwrap();
+
         let mut gyro_data = [0u16; 3];
         let mut accel_data = [0u16; 3];
 
@@ -74,17 +106,5 @@ pub async fn imu_task(bus: Spi<'static, SPI3, FullDuplexMode>) -> ! {
         accel_data[0] = all_readouts.outx_a();
         accel_data[1] = all_readouts.outy_a();
         accel_data[2] = all_readouts.outz_a();
-
-        log::info!(
-            "Gyro: {:7.2} {:7.2} {:7.2}, Accel: {:7.2} {:7.2} {:7.2}",
-            (gyro_data[0] as i16 as f32) * (70.0f32 * 0.001f32),
-            (gyro_data[1] as i16 as f32) * (70.0f32 * 0.001f32),
-            (gyro_data[2] as i16 as f32) * (70.0f32 * 0.001f32),
-            (accel_data[0] as i16 as f32) * (0.244f32 * 9.81f32 * 0.001f32),
-            (accel_data[1] as i16 as f32) * (0.244f32 * 9.81f32 * 0.001f32),
-            (accel_data[2] as i16 as f32) * (0.244f32 * 9.81f32 * 0.001f32)
-        );
-
-        Timer::after(Duration::from_millis(30)).await;
     }
 }
