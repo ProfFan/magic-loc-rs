@@ -1,6 +1,11 @@
 use core::{fmt, marker::PhantomData};
 
+// #[cfg(feature = "blocking")]
 use embedded_hal::blocking::spi;
+#[cfg(feature = "async")]
+use embedded_hal_async::spi as async_spi;
+
+use log;
 
 pub struct LSM6DSO<SPI> {
     bus: SPI,
@@ -79,6 +84,79 @@ where
         init_header::<R>(true, buffer);
 
         <SPI as spi::Write<u8>>::write(&mut self.0.bus, buffer).map_err(Error::Write)?;
+
+        Ok(())
+    }
+}
+
+/// Provide async access to a register
+#[cfg(feature = "async")]
+impl<'s, R, SPI> RegAccessor<'s, R, SPI>
+where
+    SPI: spi::Transfer<u8>,
+    SPI: spi::Write<u8, Error = <SPI as spi::Transfer<u8>>::Error>,
+    SPI: async_spi::SpiBus<Error = <SPI as spi::Transfer<u8>>::Error>,
+{
+    /// Read from the register
+    pub async fn async_read(&mut self) -> Result<R::Read, Error<SPI>>
+    where
+        R: Register + Readable,
+        [(); R::LEN]: Sized,
+    {
+        let mut r = R::read();
+        let mut buffer = R::buffer(&mut r);
+        let mut write_buffer: [u8; R::LEN] = [0u8; R::LEN];
+
+        init_header::<R>(false, &mut write_buffer);
+        async_spi::SpiBus::transfer(&mut self.0.bus, &mut buffer, &write_buffer)
+            .await
+            .map_err(|e| Error::Transfer(e))?;
+
+        log::debug!("Read: {:?}", buffer);
+
+        Ok(r)
+    }
+
+    /// Write to the register
+    pub async fn async_write<F>(&mut self, f: F) -> Result<(), Error<SPI>>
+    where
+        R: Register + Writable,
+        F: FnOnce(&mut R::Write) -> &mut R::Write,
+    {
+        let mut w = R::write();
+        f(&mut w);
+
+        let buffer = R::buffer(&mut w);
+
+        let header_size = init_header::<R>(true, buffer);
+
+        async_spi::SpiBus::write(&mut self.0.bus, &buffer[header_size..])
+            .await
+            .map_err(|e| Error::Write(e))?;
+
+        Ok(())
+    }
+
+    /// Modify the register
+    pub async fn async_modify<F>(&mut self, f: F) -> Result<(), Error<SPI>>
+    where
+        R: Register + Readable + Writable,
+        F: for<'r> FnOnce(&mut R::Read, &'r mut R::Write) -> &'r mut R::Write,
+        [(); R::LEN]: Sized,
+    {
+        let mut r = self.async_read().await?;
+        let mut w = R::write();
+
+        <R as Writable>::buffer(&mut w).copy_from_slice(<R as Readable>::buffer(&mut r));
+
+        f(&mut r, &mut w);
+
+        let buffer = <R as Writable>::buffer(&mut w);
+        let header_size = init_header::<R>(true, buffer);
+
+        async_spi::SpiBus::write(&mut self.0.bus, &buffer[header_size..])
+            .await
+            .map_err(Error::Write)?;
 
         Ok(())
     }

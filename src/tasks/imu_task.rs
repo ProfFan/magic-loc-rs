@@ -1,4 +1,4 @@
-use embassy_time::{Duration, Timer};
+use embassy_time::{Duration, Instant, Timer};
 use embedded_hal_async::digital::Wait;
 use hal::{
     gdma::ChannelCreator0,
@@ -42,7 +42,7 @@ pub async fn imu_task(
     log::info!("WHOAMI Async: {:0x}", recv_buf[1]);
 
     // Use the high level to read the WHOAMI register
-    let whoami = imu.ll().who_am_i().read().unwrap();
+    let whoami = imu.ll().who_am_i().async_read().await.unwrap();
 
     log::info!("WHOAMI: {:0x}", whoami.value());
 
@@ -56,7 +56,11 @@ pub async fn imu_task(
     }
 
     // Reset the device
-    imu.ll().ctrl3_c().modify(|_, w| w.sw_reset(0x1)).unwrap();
+    imu.ll()
+        .ctrl3_c()
+        .async_modify(|_, w| w.sw_reset(0x1))
+        .await
+        .unwrap();
 
     // Wait for the reset to complete
     loop {
@@ -99,6 +103,8 @@ pub async fn imu_task(
     // Read once to clear the interrupt
     let _ = imu.ll().all_readouts().read().unwrap();
 
+    let mut count: i32 = 0;
+    let mut ts_now = Instant::now();
     loop {
         // Wait for the interrupt
         int1.wait_for_high().await.unwrap();
@@ -106,7 +112,7 @@ pub async fn imu_task(
         let mut gyro_data = [0u16; 3];
         let mut accel_data = [0u16; 3];
 
-        let all_readouts = imu.ll().all_readouts().read().unwrap();
+        let all_readouts = imu.ll().all_readouts().async_read().await.unwrap();
 
         gyro_data[0] = all_readouts.outx_g();
         gyro_data[1] = all_readouts.outy_g();
@@ -125,5 +131,17 @@ pub async fn imu_task(
             (accel_data[1] as i16),
             (accel_data[2] as i16)
         );
+
+        count += 1;
+
+        if count == 1000 {
+            let ts_now_new = Instant::now();
+            let ts_diff = ts_now_new - ts_now;
+            ts_now = ts_now_new;
+
+            log::info!("IMU Freq = {}", 1000_000.0 / (ts_diff.as_millis() as f32));
+
+            count = 0;
+        }
     }
 }
