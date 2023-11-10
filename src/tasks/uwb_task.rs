@@ -19,7 +19,8 @@ pub async fn uwb_task(
 ) -> ! {
     log::info!("UWB Task Start!");
 
-    let config = dw3000::Config::default();
+    let mut config = dw3000::Config::default();
+    config.bitrate = dw3000::configs::BitRate::Kbps6800;
 
     // Reset
     rst_gpio.set_low().unwrap();
@@ -51,6 +52,11 @@ pub async fn uwb_task(
     dw3000.disable_spirdy_interrupt().unwrap();
 
     dw3000.enable_tx_interrupts().unwrap();
+
+    // Calculate the time to send
+    let time_frame = magic_loc_protocol::util::frame_tx_time(12, &config, true);
+
+    log::info!("Time to send: {:?} ns", time_frame);
 
     loop {
         // int_gpio.wait_for_falling_edge().await.unwrap();

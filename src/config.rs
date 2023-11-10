@@ -9,6 +9,8 @@ pub enum Mode {
     Anchor = 0,
     /// Device is in tag mode
     Tag = 1,
+    /// Device is in sniffer mode
+    Sniffer = 2,
 }
 
 /// Config struct saved to flash

@@ -139,7 +139,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     // Load config from flash
     let mut config = load_config().await.unwrap();
 
-    // config.mode = config::Mode::Anchor;
+    // config.mode = config::Mode::Sniffer;
     // write_config(&config).await.unwrap();
 
     log::info!("Config: {:?}", config);
@@ -180,19 +180,16 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     if config.mode == config::Mode::Tag {
         log::info!("Mode = TAG, starting IMU");
 
-
         let imu_spawner = INT_EXECUTOR_CORE_0.start(interrupt::Priority::Priority1);
         // IMU Task
-        let imu_spi = hal::spi::master::Spi::new(
-            peripherals.SPI3,
-            io.pins.gpio33,
-            io.pins.gpio47,
-            io.pins.gpio17,
-            io.pins.gpio34,
-            30u32.MHz(),
-            SpiMode::Mode0,
-            &clocks,
-        );
+        let imu_spi =
+            hal::spi::master::Spi::new(peripherals.SPI3, 30u32.MHz(), SpiMode::Mode0, &clocks)
+                .with_pins(
+                    Some(io.pins.gpio33),
+                    Some(io.pins.gpio47),
+                    Some(io.pins.gpio17),
+                    Some(io.pins.gpio34),
+                );
 
         // IMU INT
         let int_imu = io.pins.gpio48.into_pull_down_input();
@@ -204,15 +201,11 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     }
 
     // DW3000 SPI
-    let dw3000_spi: hal::spi::master::Spi<SPI2, FullDuplexMode> = hal::spi::master::Spi::new_no_cs(
-        peripherals.SPI2,
-        io.pins.gpio36,
-        io.pins.gpio35,
-        io.pins.gpio37,
-        30u32.MHz(),
-        SpiMode::Mode0,
-        &clocks,
-    );
+    let dw3000_spi: hal::spi::master::Spi<SPI2, FullDuplexMode> =
+        hal::spi::master::Spi::new(peripherals.SPI2, 30u32.MHz(), SpiMode::Mode0, &clocks)
+            .with_mosi(io.pins.gpio35)
+            .with_sck(io.pins.gpio36)
+            .with_miso(io.pins.gpio37);
 
     // DW3000 Interrupt
     let int_dw3000 = io.pins.gpio15.into_pull_down_input();
