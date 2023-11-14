@@ -1,9 +1,10 @@
 [target.xtensa-esp32s3-none-elf]
-runner = "espflash flash --monitor"
+runner = "espflash flash --monitor --log-format defmt"
 
 
 [env]
 ESP_LOGLEVEL="INFO"
+DEFMT_LOG="info"
 
 [build]
 rustflags = [
@@ -11,6 +12,7 @@ rustflags = [
   # "-C", "link-arg=-Trom_functions.x",
 
   "-C", "link-arg=-nostartfiles",
+  "-C", "link-arg=-Tdefmt.x",
 ]
 
 target = "xtensa-esp32s3-none-elf"

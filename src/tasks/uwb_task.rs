@@ -8,7 +8,34 @@ use hal::{
     spi::{master::Spi, FullDuplexMode},
 };
 
-use crate::nb;
+/// Calls `s_wait` on the `Sending` state of the DW3000 driver asynchronously.
+///
+/// When `s_wait` returns `nb::Error::WouldBlock`, this function will wait for
+/// the DW3000's IRQ output to go high, and then call `s_wait` again.
+#[inline]
+pub async fn nonblocking_s_wait(
+    dw3000: &mut dw3000::DW3000<
+        Spi<'static, SPI2, FullDuplexMode>,
+        GpioPin<Output<PushPull>, 8>,
+        dw3000::Sending,
+    >,
+    int_gpio: &mut impl embedded_hal_async::digital::Wait,
+) -> Result<
+    dw3000::time::Instant,
+    dw3000::Error<Spi<'static, SPI2, FullDuplexMode>, GpioPin<Output<PushPull>, 8>>,
+> {
+    loop {
+        match dw3000.s_wait() {
+            Ok(instant) => return Ok(instant),
+            Err(nb::Error::WouldBlock) => {
+                // Wait for the IRQ output to go high
+                int_gpio.wait_for_high().await.unwrap();
+                continue;
+            }
+            Err(nb::Error::Other(e)) => return Err(e),
+        }
+    }
+}
 
 #[embassy_executor::task]
 pub async fn uwb_task(
@@ -17,10 +44,10 @@ pub async fn uwb_task(
     mut rst_gpio: GpioPin<Output<PushPull>, 9>,
     mut int_gpio: GpioPin<Input<PullDown>, 15>,
 ) -> ! {
-    log::info!("UWB Task Start!");
+    defmt::info!("UWB Task Start!");
 
     let mut config = dw3000::Config::default();
-    config.bitrate = dw3000::configs::BitRate::Kbps6800;
+    // config.bitrate = dw3000::configs::BitRate::Kbps6800;
 
     // Reset
     rst_gpio.set_low().unwrap();
@@ -29,7 +56,7 @@ pub async fn uwb_task(
 
     rst_gpio.set_high().unwrap();
 
-    log::info!("DW3000 Reset!");
+    defmt::info!("DW3000 Reset!");
 
     Timer::after(Duration::from_millis(200)).await;
 
@@ -56,12 +83,13 @@ pub async fn uwb_task(
     // Calculate the time to send
     let time_frame = magic_loc_protocol::util::frame_tx_time(12, &config, true);
 
-    log::info!("Time to send: {:?} ns", time_frame);
+    defmt::info!("Time to send: {:?} ns", time_frame);
 
     loop {
-        // int_gpio.wait_for_falling_edge().await.unwrap();
+        let start_time = embassy_time::Instant::now();
+
         let mut sending = dw3000
-            .send(
+            .send_raw(
                 &[
                     0xDEu8, 0xAD, 0xBE, 0xEF, 0xDEu8, 0xAD, 0xBE, 0xEF, 0xDEu8, 0xAD, 0xBE, 0xEF,
                     0xDEu8, 0xAD, 0xBE, 0xEF, 0xDEu8, 0xAD, 0xBE, 0xEF,
@@ -71,36 +99,22 @@ pub async fn uwb_task(
             )
             .expect("Failed to send.");
 
-        // wait for interrupt
-        int_gpio.wait_for_high().await.unwrap();
+        let time_to_sending = start_time.elapsed().as_micros();
 
-        // Clear interrupt
-        loop {
-            let state = sending.s_wait();
-            match state {
-                Ok(inst) => {
-                    log::info!("Send complete! at {:?}", inst);
+        // Wait for the transmission to complete
+        let send_result = nonblocking_s_wait(&mut sending, &mut int_gpio).await;
 
-                    break;
-                }
-                Err(e) => {
-                    // Check error type
-                    match e {
-                        nb::Error::WouldBlock => {
-                            // IRQ fired, but send not complete
-                            log::info!("IRQ Fired, but send not complete!");
-                            continue;
-                        }
-                        nb::Error::Other(e) => {
-                            // Some other error
-                            log::info!("Other error: {:?}", e);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+        let send_ts = send_result.unwrap();
         dw3000 = sending.finish_sending().expect("Failed to finish sending.");
+
+        let time_to_sent = start_time.elapsed().as_micros();
+
+        defmt::info!(
+            "S/C/TS: {}, TTS: {:?}, TTT: {:?}",
+            send_ts.value(),
+            time_to_sending,
+            time_to_sent,
+        );
 
         Timer::after(Duration::from_millis(1200)).await;
     }

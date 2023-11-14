@@ -112,7 +112,7 @@ where
             .await
             .map_err(|e| Error::Transfer(e))?;
 
-        log::debug!("Read: {:?}", buffer);
+        defmt::debug!("Read: {:?}", buffer);
 
         Ok(r)
     }

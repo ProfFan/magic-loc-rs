@@ -18,6 +18,8 @@ const NVS_ADDR: u32 = 0x9000;
 
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
+use esp_println as _;
+
 use hal::{
     clock::{ClockControl, Clocks},
     cpu_control::{CpuControl, Stack},
@@ -80,7 +82,7 @@ async fn led_blinker(mut led: GpioPin<hal::gpio::Output<hal::gpio::PushPull>, 7>
 /// Power-on configuration loader
 async fn load_config() -> Option<config::MagicLocConfig> {
     let mut storage = FlashStorage::new();
-    log::info!("Flash size = {}", storage.capacity());
+    defmt::info!("Flash size = {}", storage.capacity());
 
     let mut buf = [0u8; core::mem::size_of::<MagicLocConfig>()];
 
@@ -91,14 +93,17 @@ async fn load_config() -> Option<config::MagicLocConfig> {
             let config = from_bytes::<MagicLocConfig>(&buf);
 
             if config.is_err() {
-                log::error!("Failed, reason {:?}", config.as_ref());
+                defmt::error!(
+                    "Failed, reason {:?}",
+                    config.expect_err("Failed to parse config")
+                );
                 return Err(());
             }
 
             return config.map_err(|_| ());
         })
         .or_else(|_| -> Result<_, ()> {
-            log::info!("No config found!");
+            defmt::info!("No config found!");
             // Make default
             let config = MagicLocConfig::default();
 
@@ -108,7 +113,7 @@ async fn load_config() -> Option<config::MagicLocConfig> {
 
             storage.write(NVS_ADDR, buf).unwrap();
 
-            log::info!("Saved default config!");
+            defmt::info!("Saved default config!");
 
             return Ok(config);
         })
@@ -124,7 +129,7 @@ async fn write_config(config: &MagicLocConfig) -> Result<(), ()> {
 
     storage.write(NVS_ADDR, buf).map_err(|_| ())?;
 
-    log::info!("Saved config!");
+    defmt::info!("Saved config!");
 
     return Ok(());
 }
@@ -139,10 +144,10 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     // Load config from flash
     let mut config = load_config().await.unwrap();
 
-    // config.mode = config::Mode::Sniffer;
-    // write_config(&config).await.unwrap();
+    config.mode = config::Mode::Tag;
+    write_config(&config).await.unwrap();
 
-    log::info!("Config: {:?}", config);
+    defmt::info!("Config: {:?}", config);
 
     interrupt::enable(Interrupt::GPIO, interrupt::Priority::Priority2).unwrap();
 
@@ -150,12 +155,12 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
 
     spawner.spawn(led_blinker(led)).ok();
 
-    // 100kHz I2C clock for the SGM41511
+    // 400kHz I2C clock for the SGM41511
     let i2c: I2C<I2C0> = hal::i2c::I2C::new(
         peripherals.I2C0,
         io.pins.gpio1,
         io.pins.gpio2,
-        100u32.kHz(),
+        400u32.kHz(),
         &clocks,
     );
 
@@ -178,7 +183,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     .unwrap();
 
     if config.mode == config::Mode::Tag {
-        log::info!("Mode = TAG, starting IMU");
+        defmt::info!("Mode = TAG, starting IMU");
 
         let imu_spawner = INT_EXECUTOR_CORE_0.start(interrupt::Priority::Priority1);
         // IMU Task
@@ -202,7 +207,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
 
     // DW3000 SPI
     let dw3000_spi: hal::spi::master::Spi<SPI2, FullDuplexMode> =
-        hal::spi::master::Spi::new(peripherals.SPI2, 30u32.MHz(), SpiMode::Mode0, &clocks)
+        hal::spi::master::Spi::new(peripherals.SPI2, 36u32.MHz(), SpiMode::Mode0, &clocks)
             .with_mosi(io.pins.gpio35)
             .with_sck(io.pins.gpio36)
             .with_miso(io.pins.gpio37);

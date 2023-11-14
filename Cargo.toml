@@ -14,7 +14,9 @@ members = ["lsm6dso"]
 #     "esp-now",
 #     "phy-enable-usb",
 # ] }
-dw3000 = { package = "dw3000", git = "https://github.com/ProfFan/dw3000", branch = "RUST" }
+dw3000 = { package = "dw3000", git = "https://github.com/ProfFan/dw3000", branch = "RUST", features = [
+    "defmt",
+] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
 magic-loc-protocol = { package = "magic-loc-protocol", git = "ssh://git@github.com/ProfFan/magic-loc-protocol.git" }
 
@@ -33,23 +35,27 @@ esp-backtrace = { version = "0.9.0", default-features = false, features = [
     "exception-handler",
     "print-jtag-serial",
 ] }
-esp-println = { version = "0.7.0", default-features = false, features = [
+esp-println = { git = "https://github.com/ProfFan/esp-println", branch = "fifo", default-features = false, features = [
     "esp32s3",
     "log",
-    "colors",
+    "defmt-espflash",
     "jtag_serial",
+    "critical-section"
 ] }
 
+# esp-println = { version = "0.7.1", default-features = false, features = [
 esp-storage = { version = "*", features = ["esp32s3"] }
 embedded-storage = "0.3.0"
-postcard = "1.0.*"
+postcard = { version = "1.0.*", features = ["use-defmt"] }
 
 # By default, `serde` has the `std` feature enabled, which makes it unsuitable for embedded targets
 # disabling default-features fixes this
 serde = { version = "1.0.*", default-features = false }
 binrw = { version = "0.13.1", default-features = false }
 
-log = { version = "0.4.18" }
+# log = { version = "0.4.18" }
+defmt = { package = "defmt", version = "*", features = ["encoding-rzcobs"] }
+
 esp-alloc = { version = "0.3.0" }
 smoltcp = { version = "0.10.0", default-features = false, features = [
     "proto-igmp",
@@ -68,10 +74,7 @@ heapless = { version = "0.7.14", default-features = false }
 
 embassy-executor = { version = "0.3.0", features = ["nightly"] }
 
-embassy-time = { version = "0.1", features = ["nightly"] }
-
-# [profile.dev.package.esp-wifi]
-# opt-level = 3
+embassy-time = { version = "0.1", features = ["nightly", "defmt"] }
 
 [profile.dev.package.dw3000]
 opt-level = 3
@@ -82,4 +85,5 @@ opt-level = 3
 [profile.dev]
 lto = "off"
 [profile.release]
-lto = "off"
+lto = "fat"
+opt-level = 3

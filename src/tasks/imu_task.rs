@@ -18,7 +18,7 @@ pub async fn imu_task(
     dma_channel: ChannelCreator0,
     mut int1: GpioPin<Input<PullDown>, 48>,
 ) -> ! {
-    log::info!("IMU Task Start!");
+    defmt::info!("IMU Task Start!");
 
     let mut descriptors = [0u32; 8 * 3];
     let mut rx_descriptors = [0u32; 8 * 3];
@@ -39,16 +39,16 @@ pub async fn imu_task(
         .await
         .unwrap();
 
-    log::info!("WHOAMI Async: {:0x}", recv_buf[1]);
+    defmt::info!("WHOAMI Async: {:#x}", recv_buf[1]);
 
     // Use the high level to read the WHOAMI register
     let whoami = imu.ll().who_am_i().async_read().await.unwrap();
 
-    log::info!("WHOAMI: {:0x}", whoami.value());
+    defmt::info!("WHOAMI: {:#x}", whoami.value());
 
     // Assert that the WHOAMI register is correct
     if whoami.value() != 0x6C {
-        log::error!("WHOAMI register is incorrect!");
+        defmt::error!("WHOAMI register is incorrect!");
 
         loop {
             Timer::after(Duration::from_millis(100)).await;
@@ -92,7 +92,7 @@ pub async fn imu_task(
     let freq_fine_b = imu.ll().freq_fine().read().unwrap();
     let odr_actual = (6667.0 + ((0.0015 * (freq_fine_b.value() as f32)) * 6667.0)) / 8.0;
 
-    log::info!("ODR Actual: {}", odr_actual);
+    defmt::info!("ODR Actual: {}", odr_actual);
 
     // Set INT1 to DRDY_XL
     imu.ll()
@@ -122,8 +122,8 @@ pub async fn imu_task(
         accel_data[1] = all_readouts.outy_a();
         accel_data[2] = all_readouts.outz_a();
 
-        log::debug!(
-            "Gyro: {:} {:} {:}, Accel: {:} {:} {:}",
+        defmt::info!(
+            "Gyro: {} {} {}, Accel {} {} {}",
             (gyro_data[0] as i16),
             (gyro_data[1] as i16),
             (gyro_data[2] as i16),
@@ -134,12 +134,12 @@ pub async fn imu_task(
 
         count += 1;
 
-        if count == 1000 {
+        if count == 800 {
             let ts_now_new = Instant::now();
             let ts_diff = ts_now_new - ts_now;
             ts_now = ts_now_new;
 
-            log::info!("IMU Freq = {}", 1000_000.0 / (ts_diff.as_millis() as f32));
+            defmt::info!("IMU Freq = {}", 800_000.0 / (ts_diff.as_millis() as f32));
 
             count = 0;
         }

@@ -1,4 +1,4 @@
-use dw3000::{self};
+use dw3000::{self, hl::ConfigGPIOs};
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::digital::Wait;
 use hal::{
@@ -11,15 +11,16 @@ use hal::{
 use crate::nb;
 
 #[embassy_executor::task]
-pub async fn uwb_recv_task(
+pub async fn uwb_anchor_task(
     bus: Spi<'static, SPI2, FullDuplexMode>,
     cs_gpio: GpioPin<Output<PushPull>, 8>,
     mut rst_gpio: GpioPin<Output<PushPull>, 9>,
     mut int_gpio: GpioPin<Input<PullDown>, 15>,
 ) -> ! {
-    log::info!("UWB Recv Task Start!");
+    defmt::info!("UWB Anchor Task Start!");
 
-    let config = dw3000::Config::default();
+    let mut config = dw3000::Config::default();
+    config.bitrate = dw3000::configs::BitRate::Kbps6800;
 
     // Reset
     rst_gpio.set_low().unwrap();
@@ -28,35 +29,43 @@ pub async fn uwb_recv_task(
 
     rst_gpio.set_high().unwrap();
 
+    defmt::info!("DW3000 Reset!");
+
     Timer::after(Duration::from_millis(200)).await;
 
-    let dw3000 = dw3000::DW3000::new(bus, cs_gpio)
+    let mut dw3000 = dw3000::DW3000::new(bus, cs_gpio)
         .init()
-        .expect("Failed init.");
+        .expect("Failed init.")
+        .config(config)
+        .expect("Failed config.");
 
-    let mut dw3000 = dw3000.config(config).expect("Failed config.");
+    dw3000.gpio_config(ConfigGPIOs::enable_led()).unwrap();
+    dw3000
+        .ll()
+        .led_ctrl()
+        .modify(|_, w| w.blink_tim(0x2))
+        .unwrap();
 
     Timer::after(Duration::from_millis(200)).await;
 
-    dw3000.disable_interrupts().unwrap();
+    // Disable SPIRDY interrupt
+    dw3000.disable_spirdy_interrupt().unwrap();
 
-    dw3000.enable_rx_interrupts().unwrap();
+    dw3000.enable_tx_interrupts().unwrap();
 
     loop {
         // int_gpio.wait_for_falling_edge().await.unwrap();
         let mut rxing = dw3000.receive(config).expect("Failed to receive.");
 
-        // wait for interrupt
-        int_gpio.wait_for_high().await.unwrap();
-
         // Clear interrupt
         loop {
+            // wait for interrupt
+            int_gpio.wait_for_high().await.unwrap();
+
             let mut buffer = [0u8; 1024];
             let state = rxing.r_wait(&mut buffer);
             match state {
                 Ok(inst) => {
-                    log::info!("Recv complete! at {:?}", inst);
-
                     break;
                 }
                 Err(e) => {
@@ -64,12 +73,12 @@ pub async fn uwb_recv_task(
                     match e {
                         nb::Error::WouldBlock => {
                             // IRQ fired, but rx not complete
-                            log::info!("IRQ Fired, but rx not complete!");
-                            continue;
+                            defmt::info!("IRQ Fired, but rx not complete!");
+                            continue; // Continue waiting for interrupt
                         }
                         nb::Error::Other(e) => {
                             // Some other error
-                            log::info!("Other error: {:?}", e);
+                            defmt::info!("Other error: SPI");
                             break;
                         }
                     }
