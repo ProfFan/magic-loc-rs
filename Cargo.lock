@@ -321,7 +321,7 @@ dependencies = [
 [[package]]
 name = "dw3000"
 version = "0.2.0"
-source = "git+https://github.com/ProfFan/dw3000?branch=RUST#8e01feaf88cd9cc88de3bcfca25ced4d4d985009"
+source = "git+https://github.com/ProfFan/dw3000?branch=RUST#ea753b688c3fd427d21d033e3511f543cb7577d3"
 dependencies = [
  "byte",
  "defmt",
@@ -558,7 +558,7 @@ dependencies = [
 [[package]]
 name = "esp-hal-common"
 version = "0.13.1"
-source = "git+https://github.com/esp-rs/esp-hal?branch=main#957b232413cdf71c863534cbdd5da06783ee4d5d"
+source = "git+https://github.com/ProfFan/esp-hal?rev=3215aa8874cdc213a09d6840000e887e94973c9c#3215aa8874cdc213a09d6840000e887e94973c9c"
 dependencies = [
  "basic-toml",
  "bitfield",
@@ -594,7 +594,7 @@ dependencies = [
 [[package]]
 name = "esp-hal-procmacros"
 version = "0.7.0"
-source = "git+https://github.com/esp-rs/esp-hal?branch=main#957b232413cdf71c863534cbdd5da06783ee4d5d"
+source = "git+https://github.com/ProfFan/esp-hal?rev=3215aa8874cdc213a09d6840000e887e94973c9c#3215aa8874cdc213a09d6840000e887e94973c9c"
 dependencies = [
  "darling",
  "litrs",
@@ -658,7 +658,7 @@ dependencies = [
 [[package]]
 name = "esp32s3-hal"
 version = "0.13.0"
-source = "git+https://github.com/esp-rs/esp-hal?branch=main#957b232413cdf71c863534cbdd5da06783ee4d5d"
+source = "git+https://github.com/ProfFan/esp-hal?rev=3215aa8874cdc213a09d6840000e887e94973c9c#3215aa8874cdc213a09d6840000e887e94973c9c"
 dependencies = [
  "embassy-time",
  "esp-hal-common",
@@ -914,6 +914,7 @@ dependencies = [
  "postcard",
  "serde",
  "smoltcp",
+ "static_cell",
 ]
 
 [[package]]
@@ -1021,6 +1022,12 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "portable-atomic"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bccab0e7fd7cc19f820a1c8c91720af652d0c88dc9664dd72aef2614f04af3b"
 
 [[package]]
 name = "postcard"
@@ -1221,6 +1228,15 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "static_cell"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa6ba4cf83bf80d3eb25f098ea5e790a0a1fcb5e357442259b231e412c2d3ca0"
+dependencies = [
+ "portable-atomic",
+]
 
 [[package]]
 name = "strsim"

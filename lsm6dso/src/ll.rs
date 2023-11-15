@@ -5,8 +5,6 @@ use embedded_hal::blocking::spi;
 #[cfg(feature = "async")]
 use embedded_hal_async::spi as async_spi;
 
-use log;
-
 pub struct LSM6DSO<SPI> {
     bus: SPI,
 }

@@ -4,6 +4,7 @@
 
 mod config;
 mod tasks;
+mod util;
 
 extern crate alloc;
 use config::MagicLocConfig;
@@ -149,7 +150,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
 
     defmt::info!("Config: {:?}", config);
 
-    interrupt::enable(Interrupt::GPIO, interrupt::Priority::Priority2).unwrap();
+    interrupt::enable(Interrupt::GPIO, interrupt::Priority::Priority3).unwrap();
 
     let led = io.pins.gpio7.into_push_pull_output();
 

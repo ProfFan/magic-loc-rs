@@ -20,13 +20,14 @@ dw3000 = { package = "dw3000", git = "https://github.com/ProfFan/dw3000", branch
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
 magic-loc-protocol = { package = "magic-loc-protocol", git = "ssh://git@github.com/ProfFan/magic-loc-protocol.git" }
 
-hal = { package = "esp32s3-hal", git = "https://github.com/esp-rs/esp-hal", branch = "main", features = [
+hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal", rev = "3215aa8874cdc213a09d6840000e887e94973c9c", features = [
     "embassy",
     "embassy-executor-interrupt",
     "embassy-executor-thread",
     "embassy-time-systick",
     "async",
 ] }
+static_cell = { version = "*", features = ["nightly"] }
 embedded-hal = "*"
 embedded-hal-async = "=1.0.0-rc.1"
 esp-backtrace = { version = "0.9.0", default-features = false, features = [

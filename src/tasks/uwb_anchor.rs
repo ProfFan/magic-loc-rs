@@ -65,7 +65,7 @@ pub async fn uwb_anchor_task(
             let mut buffer = [0u8; 1024];
             let state = rxing.r_wait(&mut buffer);
             match state {
-                Ok(inst) => {
+                Ok(_) => {
                     break;
                 }
                 Err(e) => {
@@ -76,7 +76,7 @@ pub async fn uwb_anchor_task(
                             defmt::info!("IRQ Fired, but rx not complete!");
                             continue; // Continue waiting for interrupt
                         }
-                        nb::Error::Other(e) => {
+                        nb::Error::Other(_) => {
                             // Some other error
                             defmt::info!("Other error: SPI");
                             break;
