@@ -1,9 +1,10 @@
+use binrw::*;
 use defmt::Format;
-use serde::{Deserialize, Serialize};
 
 /// enum for device operation mode
-#[derive(Default, Debug, Serialize, Deserialize, Format, PartialEq, Clone, Copy)]
-#[repr(u8)]
+#[derive(Default, Debug, Format, PartialEq, Clone, Copy)]
+#[binrw]
+#[brw(repr(u8))]
 pub enum Mode {
     /// Device is in anchor mode
     #[default]
@@ -15,9 +16,15 @@ pub enum Mode {
 }
 
 /// Config struct saved to flash
-#[derive(Default, Debug, Serialize, Deserialize, Format, Clone, Copy)]
+#[binrw]
+#[brw(magic = b"MAGL", little)]
+#[derive(Default, Debug, Format, Clone, Copy)]
 pub struct MagicLocConfig {
     pub uwb_addr: u16,
     pub uwb_pan_id: u16,
     pub mode: Mode,
+}
+
+impl MagicLocConfig {
+    pub const MAX_SIZE: usize = 128;
 }

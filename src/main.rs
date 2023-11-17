@@ -11,9 +11,9 @@ use config::MagicLocConfig;
 use core::mem::MaybeUninit;
 use embassy_executor::Spawner;
 
+use binrw::{io::Cursor, BinRead, BinWrite};
 use embedded_storage::{ReadStorage, Storage};
 use esp_storage::FlashStorage;
-use postcard::from_bytes;
 
 const NVS_ADDR: u32 = 0x9000;
 
@@ -85,19 +85,20 @@ async fn load_config() -> Option<config::MagicLocConfig> {
     let mut storage = FlashStorage::new();
     defmt::info!("Flash size = {}", storage.capacity());
 
-    let mut buf = [0u8; core::mem::size_of::<MagicLocConfig>()];
+    let mut buf = [0u8; MagicLocConfig::MAX_SIZE];
 
     return storage
         .read(NVS_ADDR, &mut buf)
         .map_err(|_| ())
         .and_then(|_| -> Result<MagicLocConfig, ()> {
-            let config = from_bytes::<MagicLocConfig>(&buf);
+            let config = MagicLocConfig::read(&mut Cursor::new(&buf)).map_err(|_| ());
 
             if config.is_err() {
                 defmt::error!(
                     "Failed, reason {:?}",
                     config.expect_err("Failed to parse config")
                 );
+                defmt::error!("Buffer = {:x}", &buf);
                 return Err(());
             }
 
@@ -109,10 +110,10 @@ async fn load_config() -> Option<config::MagicLocConfig> {
             let config = MagicLocConfig::default();
 
             // save to flash
-            let mut buf = [0u8; core::mem::size_of::<MagicLocConfig>()];
-            let buf = postcard::to_slice(&config, &mut buf).unwrap();
+            let mut buf = [0u8; MagicLocConfig::MAX_SIZE];
+            MagicLocConfig::write(&config, &mut Cursor::new(buf.as_mut_slice())).map_err(|_| ())?;
 
-            storage.write(NVS_ADDR, buf).unwrap();
+            storage.write(NVS_ADDR, &buf).unwrap();
 
             defmt::info!("Saved default config!");
 
@@ -125,17 +126,17 @@ async fn write_config(config: &MagicLocConfig) -> Result<(), ()> {
     let mut storage = FlashStorage::new();
 
     // save to flash
-    let mut buf = [0u8; core::mem::size_of::<MagicLocConfig>()];
-    let buf = postcard::to_slice(config, &mut buf).map_err(|_| ())?;
+    let mut buf = [0u8; MagicLocConfig::MAX_SIZE];
+    MagicLocConfig::write(config, &mut Cursor::new(buf.as_mut_slice())).map_err(|_| ())?;
 
-    storage.write(NVS_ADDR, buf).map_err(|_| ())?;
+    storage.write(NVS_ADDR, &buf).map_err(|_| ())?;
 
     defmt::info!("Saved config!");
 
     return Ok(());
 }
 
-#[embassy_executor::task]
+#[embassy_executor::task(pool_size = 8)]
 async fn startup_task(clocks: Clocks<'static>) -> ! {
     let peripherals = unsafe { Peripherals::steal() };
     let spawner = Spawner::for_current_executor().await;
@@ -149,6 +150,9 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     write_config(&config).await.unwrap();
 
     defmt::info!("Config: {:?}", config);
+
+    // Try read back config
+    let config = load_config().await.unwrap();
 
     interrupt::enable(Interrupt::GPIO, interrupt::Priority::Priority3).unwrap();
 

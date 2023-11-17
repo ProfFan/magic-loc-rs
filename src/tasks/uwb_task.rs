@@ -1,4 +1,4 @@
-use dw3000::{self, hl::ConfigGPIOs};
+use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_time::{Duration, Timer};
 use hal::{
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
@@ -7,9 +7,14 @@ use hal::{
     spi::{master::Spi, FullDuplexMode},
 };
 
+use smoltcp::wire::{
+    Ieee802154Address, Ieee802154Frame, Ieee802154FrameType, Ieee802154FrameVersion, Ieee802154Pan,
+    Ieee802154Repr,
+};
+
 use crate::util::nonblocking_s_wait;
 
-#[embassy_executor::task]
+#[embassy_executor::task(pool_size = 2)]
 pub async fn uwb_task(
     bus: Spi<'static, SPI2, FullDuplexMode>,
     cs_gpio: GpioPin<Output<PushPull>, 8>,
@@ -18,8 +23,8 @@ pub async fn uwb_task(
 ) -> ! {
     defmt::info!("UWB Task Start!");
 
-    let mut config = dw3000::Config::default();
-    config.bitrate = dw3000::configs::BitRate::Kbps850;
+    let mut config = dw3000_ng::Config::default();
+    config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
 
     // Reset
     rst_gpio.set_low().unwrap();
@@ -32,7 +37,7 @@ pub async fn uwb_task(
 
     Timer::after(Duration::from_millis(200)).await;
 
-    let mut dw3000 = dw3000::DW3000::new(bus, cs_gpio)
+    let mut dw3000 = dw3000_ng::DW3000::new(bus, cs_gpio)
         .init()
         .expect("Failed init.")
         .config(config)
@@ -60,15 +65,33 @@ pub async fn uwb_task(
     loop {
         let start_time = embassy_time::Instant::now();
 
+        let addr = smoltcp::wire::Ieee802154Address::Short([0x01, 0x02]);
+        let repr = Ieee802154Repr {
+            frame_type: Ieee802154FrameType::Data,
+            security_enabled: false,
+            frame_pending: false,
+            ack_request: true,
+            pan_id_compression: true,
+            frame_version: Ieee802154FrameVersion::Ieee802154,
+            sequence_number: Some(1),
+            dst_pan_id: Some(Ieee802154Pan(0xabcd)),
+            dst_addr: Some(Ieee802154Address::Absent),
+            src_pan_id: None,
+            src_addr: Some(addr),
+        };
+
+        let mut bytes = [0u8; 40];
+        let header_size = repr.buffer_len();
+        let mut frame = Ieee802154Frame::new_unchecked(&mut bytes[..]);
+        repr.emit(&mut frame);
+
+        let payload = &mut bytes[header_size..];
+
+        // Write to payload
+        payload[0] = 0x01;
+
         let mut sending = dw3000
-            .send_raw(
-                &[
-                    0xDEu8, 0xAD, 0xBE, 0xEF, 0xDEu8, 0xAD, 0xBE, 0xEF, 0xDEu8, 0xAD, 0xBE, 0xEF,
-                    0xDEu8, 0xAD, 0xBE, 0xEF, 0xDEu8, 0xAD, 0xBE, 0xEF,
-                ],
-                dw3000::hl::SendTime::Now,
-                config,
-            )
+            .send_raw(&bytes, dw3000_ng::hl::SendTime::Now, config)
             .expect("Failed to send.");
 
         let time_to_sending = start_time.elapsed().as_micros();
@@ -92,6 +115,6 @@ pub async fn uwb_task(
             time_to_sent,
         );
 
-        Timer::after(Duration::from_millis(1200)).await;
+        Timer::after(Duration::from_millis(1000)).await;
     }
 }

@@ -1,4 +1,4 @@
-use dw3000::{self, hl::ConfigGPIOs};
+use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::digital::Wait;
 use hal::{
@@ -19,8 +19,8 @@ pub async fn uwb_anchor_task(
 ) -> ! {
     defmt::info!("UWB Anchor Task Start!");
 
-    let mut config = dw3000::Config::default();
-    config.bitrate = dw3000::configs::BitRate::Kbps6800;
+    let mut config = dw3000_ng::Config::default();
+    config.bitrate = dw3000_ng::configs::BitRate::Kbps6800;
 
     // Reset
     rst_gpio.set_low().unwrap();
@@ -33,7 +33,7 @@ pub async fn uwb_anchor_task(
 
     Timer::after(Duration::from_millis(200)).await;
 
-    let mut dw3000 = dw3000::DW3000::new(bus, cs_gpio)
+    let mut dw3000 = dw3000_ng::DW3000::new(bus, cs_gpio)
         .init()
         .expect("Failed init.")
         .config(config)
