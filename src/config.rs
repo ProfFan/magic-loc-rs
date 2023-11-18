@@ -1,5 +1,10 @@
-use binrw::*;
+use binrw::{io::Cursor, *};
 use defmt::Format;
+
+use embedded_storage::{ReadStorage, Storage};
+use esp_storage::FlashStorage;
+
+pub(crate) static mut STORAGE_OFFSET: u32 = 0x9900;
 
 /// enum for device operation mode
 #[derive(Default, Debug, Format, PartialEq, Clone, Copy)]
@@ -15,6 +20,13 @@ pub enum Mode {
     Sniffer = 2,
 }
 
+#[derive(Default, Debug, Format, Clone, Copy)]
+#[binrw]
+pub struct NetworkTopology {
+    pub anchor_addrs: [u16; 8],
+    pub tag_addrs: [u16; 3],
+}
+
 /// Config struct saved to flash
 #[binrw]
 #[brw(magic = b"MAGL", little)]
@@ -23,8 +35,67 @@ pub struct MagicLocConfig {
     pub uwb_addr: u16,
     pub uwb_pan_id: u16,
     pub mode: Mode,
+    pub network_topology: NetworkTopology,
 }
 
 impl MagicLocConfig {
     pub const MAX_SIZE: usize = 128;
+}
+
+/// Power-on configuration loader
+pub async fn load_config() -> Option<MagicLocConfig> {
+    let mut storage = FlashStorage::new();
+    defmt::info!("Flash size = {}", storage.capacity());
+
+    let mut buf = [0u8; MagicLocConfig::MAX_SIZE];
+
+    return storage
+        .read(unsafe { STORAGE_OFFSET }, &mut buf)
+        .map_err(|_| ())
+        .and_then(|_| -> Result<MagicLocConfig, ()> {
+            let config = MagicLocConfig::read(&mut Cursor::new(&buf)).map_err(|_| ());
+
+            if config.is_err() {
+                defmt::error!(
+                    "Failed, reason {:?}",
+                    config.expect_err("Failed to parse config")
+                );
+                defmt::error!("Buffer = {:x}", &buf);
+                return Err(());
+            }
+
+            return config.map_err(|_| ());
+        })
+        .or_else(|_| -> Result<_, ()> {
+            defmt::info!("No config found!");
+            // Make default
+            let config = MagicLocConfig::default();
+
+            // save to flash
+            let mut buf = [0u8; MagicLocConfig::MAX_SIZE];
+            MagicLocConfig::write(&config, &mut Cursor::new(buf.as_mut_slice())).map_err(|_| ())?;
+
+            storage.write(unsafe { STORAGE_OFFSET }, &buf).unwrap();
+
+            defmt::info!("Saved default config!");
+
+            return Ok(config);
+        })
+        .ok();
+}
+
+pub async fn write_config(config: &MagicLocConfig) -> Result<(), ()> {
+    let mut storage = FlashStorage::new();
+
+    // save to flash
+    let mut buf = [0u8; MagicLocConfig::MAX_SIZE];
+    MagicLocConfig::write(config, &mut Cursor::new(buf.as_mut_slice())).map_err(|_| ())?;
+
+    storage
+        .write(unsafe { STORAGE_OFFSET }, &buf)
+        .map_err(|_| ())?;
+
+    defmt::info!("Saved config!");
+
+    return Ok(());
 }

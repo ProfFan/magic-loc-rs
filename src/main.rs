@@ -7,15 +7,12 @@ mod tasks;
 mod util;
 
 extern crate alloc;
-use config::MagicLocConfig;
 use core::mem::MaybeUninit;
 use embassy_executor::Spawner;
 
-use binrw::{io::Cursor, BinRead, BinWrite};
-use embedded_storage::{ReadStorage, Storage};
 use esp_storage::FlashStorage;
 
-const NVS_ADDR: u32 = 0x9000;
+use esp_partition_table as ept;
 
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
@@ -80,62 +77,6 @@ async fn led_blinker(mut led: GpioPin<hal::gpio::Output<hal::gpio::PushPull>, 7>
     }
 }
 
-/// Power-on configuration loader
-async fn load_config() -> Option<config::MagicLocConfig> {
-    let mut storage = FlashStorage::new();
-    defmt::info!("Flash size = {}", storage.capacity());
-
-    let mut buf = [0u8; MagicLocConfig::MAX_SIZE];
-
-    return storage
-        .read(NVS_ADDR, &mut buf)
-        .map_err(|_| ())
-        .and_then(|_| -> Result<MagicLocConfig, ()> {
-            let config = MagicLocConfig::read(&mut Cursor::new(&buf)).map_err(|_| ());
-
-            if config.is_err() {
-                defmt::error!(
-                    "Failed, reason {:?}",
-                    config.expect_err("Failed to parse config")
-                );
-                defmt::error!("Buffer = {:x}", &buf);
-                return Err(());
-            }
-
-            return config.map_err(|_| ());
-        })
-        .or_else(|_| -> Result<_, ()> {
-            defmt::info!("No config found!");
-            // Make default
-            let config = MagicLocConfig::default();
-
-            // save to flash
-            let mut buf = [0u8; MagicLocConfig::MAX_SIZE];
-            MagicLocConfig::write(&config, &mut Cursor::new(buf.as_mut_slice())).map_err(|_| ())?;
-
-            storage.write(NVS_ADDR, &buf).unwrap();
-
-            defmt::info!("Saved default config!");
-
-            return Ok(config);
-        })
-        .ok();
-}
-
-async fn write_config(config: &MagicLocConfig) -> Result<(), ()> {
-    let mut storage = FlashStorage::new();
-
-    // save to flash
-    let mut buf = [0u8; MagicLocConfig::MAX_SIZE];
-    MagicLocConfig::write(config, &mut Cursor::new(buf.as_mut_slice())).map_err(|_| ())?;
-
-    storage.write(NVS_ADDR, &buf).map_err(|_| ())?;
-
-    defmt::info!("Saved config!");
-
-    return Ok(());
-}
-
 #[embassy_executor::task(pool_size = 8)]
 async fn startup_task(clocks: Clocks<'static>) -> ! {
     let peripherals = unsafe { Peripherals::steal() };
@@ -143,16 +84,45 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let system = peripherals.SYSTEM.split();
 
+    // Read the partition table
+    let partition_table = ept::PartitionTable::default();
+    let mut storage = FlashStorage::new();
+    let mut storage_offset: Option<u32> = None;
+    for partition in partition_table.iter_storage(&mut storage, false) {
+        let partition = partition.unwrap();
+        defmt::info!(
+            "Partition: {:?}, offset: {:#x}",
+            partition.name(),
+            partition.offset
+        );
+        if partition.name() == "storage" {
+            storage_offset = Some(partition.offset);
+        }
+    }
+
+    let storage_offset = storage_offset.unwrap();
+    unsafe {
+        config::STORAGE_OFFSET = storage_offset;
+    }
+
+    // drop storage
+    drop(storage);
+
     // Load config from flash
-    let mut config = load_config().await.unwrap();
+    let config = config::load_config().await.unwrap();
 
-    config.mode = config::Mode::Tag;
-    write_config(&config).await.unwrap();
+    defmt::info!("Config Loaded: {:?}", config);
 
-    defmt::info!("Config: {:?}", config);
+    // config.mode = config::Mode::Tag;
+    // config.uwb_addr = 0x1234;
+    // config.uwb_pan_id = 0xBEEF;
+    // config.network_topology.tag_addrs[0] = 0x1234;
+    // config::write_config(&config).await.unwrap();
 
-    // Try read back config
-    let config = load_config().await.unwrap();
+    // defmt::info!("Config: {:?}", config);
+
+    // // Try read back config
+    // let config = config::load_config().await.unwrap();
 
     interrupt::enable(Interrupt::GPIO, interrupt::Priority::Priority3).unwrap();
 

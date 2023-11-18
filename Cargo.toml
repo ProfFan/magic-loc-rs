@@ -73,10 +73,10 @@ smoltcp = { version = "0.10.0", default-features = false, features = [
 embedded-svc = { version = "0.25.0", default-features = false, features = [] }
 embedded-io = "0.4.0"
 heapless = { version = "0.7.14", default-features = false }
-
 embassy-executor = { version = "0.3.0", features = ["nightly"] }
-
 embassy-time = { version = "0.1", features = ["nightly", "defmt"] }
+
+esp-partition-table = "~0.1"
 
 [profile.dev.package.esp-storage]
 opt-level = 3
@@ -86,3 +86,6 @@ lto = "off"
 [profile.release]
 lto = "fat"
 opt-level = 3
+
+[package.metadata.espflash]
+partition_table = "partitions.csv"
