@@ -12,7 +12,7 @@ use smoltcp::wire::{
     Ieee802154Repr,
 };
 
-use crate::util::nonblocking_s_wait;
+use crate::util::nonblocking_wait;
 
 #[embassy_executor::task(pool_size = 2)]
 pub async fn uwb_task(
@@ -82,13 +82,15 @@ pub async fn uwb_task(
 
         let mut bytes = [0u8; 40];
         let header_size = repr.buffer_len();
-        let mut frame = Ieee802154Frame::new_unchecked(&mut bytes[..]);
+        let mut frame = Ieee802154Frame::new_unchecked(&mut bytes);
         repr.emit(&mut frame);
 
         let payload = &mut bytes[header_size..];
 
         // Write to payload
-        payload[0] = 0x01;
+        payload[32] = 0xAD;
+
+        defmt::info!("Sending: {:x}", &bytes[..]);
 
         let mut sending = dw3000
             .send_raw(&bytes, dw3000_ng::hl::SendTime::Now, config)
@@ -99,7 +101,7 @@ pub async fn uwb_task(
         // Wait for the transmission to complete
         let send_result = embassy_time::with_timeout(
             Duration::from_millis(500),
-            nonblocking_s_wait(&mut sending, &mut int_gpio),
+            nonblocking_wait(|| sending.s_wait(), &mut int_gpio),
         )
         .await;
 
@@ -115,6 +117,6 @@ pub async fn uwb_task(
             time_to_sent,
         );
 
-        Timer::after(Duration::from_millis(1000)).await;
+        Timer::after(Duration::from_millis(10)).await;
     }
 }

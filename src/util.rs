@@ -1,35 +1,74 @@
-use hal::{
-    gpio::{GpioPin, Output, PushPull},
-    peripherals::SPI2,
-    prelude::*,
-    spi::{master::Spi, FullDuplexMode},
-};
-
-/// Calls `s_wait` on the `Sending` state of the DW3000 driver asynchronously.
+/// Wait on a function that returns `nb::Result` asynchronously.
 ///
-/// When `s_wait` returns `nb::Error::WouldBlock`, this function will wait for
-/// the DW3000's IRQ output to go high, and then call `s_wait` again.
+/// When `f` returns `nb::Error::WouldBlock`, this function will wait for
+/// the GPIO output to go high, and then call `f` again.
+// #[inline]
+// pub async fn nonblocking_wait_int<T, E>(
+//     mut f: impl FnMut() -> nb::Result<T, E>,
+//     int_gpio: &mut impl embedded_hal_async::digital::Wait,
+// ) -> Result<T, E> {
+//     loop {
+//         let v = f();
+//         match v {
+//             Ok(t) => return Ok(t),
+//             Err(nb::Error::Other(e)) => return Err(e),
+//             Err(nb::Error::WouldBlock) => {
+//                 int_gpio.wait_for_high().await.unwrap();
+//                 continue;
+//             }
+//         }
+//     }
+// }
+use hal::prelude::nb;
+
+/// Wait on a function that returns `nb::Result` asynchronously.
+///
+/// When `f` returns `nb::Error::WouldBlock`, this function will wait for
+/// the GPIO output to go high, and then call `f` again.
 #[inline]
-pub async fn nonblocking_s_wait(
-    dw3000: &mut dw3000_ng::DW3000<
-        Spi<'static, SPI2, FullDuplexMode>,
-        GpioPin<Output<PushPull>, 8>,
-        dw3000_ng::Sending,
-    >,
+pub async fn nonblocking_wait<T, E>(
+    mut f: impl FnMut() -> Result<T, nb::Error<E>>,
     int_gpio: &mut impl embedded_hal_async::digital::Wait,
-) -> Result<
-    dw3000_ng::time::Instant,
-    dw3000_ng::Error<Spi<'static, SPI2, FullDuplexMode>, GpioPin<Output<PushPull>, 8>>,
-> {
+) -> Result<T, E> {
     loop {
-        match dw3000.s_wait() {
-            Ok(instant) => return Ok(instant),
+        let v = f();
+
+        match v {
+            Ok(t) => return Ok(t),
+            Err(nb::Error::Other(e)) => return Err(e),
             Err(nb::Error::WouldBlock) => {
-                // Wait for the IRQ output to go high
                 int_gpio.wait_for_high().await.unwrap();
                 continue;
             }
-            Err(nb::Error::Other(e)) => return Err(e),
+        }
+    }
+}
+
+/// Wait on a function that returns `nb::Result` asynchronously.
+///
+/// NOTE: This is a more advanced version of `nonblocking_wait` that allows
+/// the function to take a mutable reference to some argument.
+///
+/// When `f` returns `nb::Error::WouldBlock`, this function will wait for
+/// the GPIO output to go high, and then call `f` again.
+#[inline]
+#[allow(dead_code)]
+pub async fn nonblocking_wait_int<'a, T: 'a, E, A>(
+    mut f: impl FnMut(&'a mut A) -> Result<T, (nb::Error<E>, &'a mut A)>,
+    int_gpio: &mut impl embedded_hal_async::digital::Wait,
+    mut arg: &'a mut A,
+) -> Result<T, E> {
+    loop {
+        let v = f(arg);
+
+        match v {
+            Ok(t) => return Ok(t),
+            Err((nb::Error::Other(e), _)) => return Err(e),
+            Err((nb::Error::WouldBlock, arg_)) => {
+                int_gpio.wait_for_high().await.unwrap();
+                arg = arg_;
+                continue;
+            }
         }
     }
 }

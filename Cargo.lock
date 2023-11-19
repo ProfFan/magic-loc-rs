@@ -266,8 +266,8 @@ dependencies = [
 
 [[package]]
 name = "dw3000-ng"
-version = "0.3.0"
-source = "git+https://github.com/ProfFan/dw3000?branch=RUST#71bc184469990b35cbe14d6569e2fbe6875b74ab"
+version = "0.3.1"
+source = "git+https://github.com/ProfFan/dw3000?branch=RUST#e19162bc378eb472811e2967072cbf0946eb5d4f"
 dependencies = [
  "byte",
  "defmt",

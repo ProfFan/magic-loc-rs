@@ -111,9 +111,9 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     // Load config from flash
     let config = config::load_config().await.unwrap();
 
-    defmt::info!("Config Loaded: {:?}", config);
+    // defmt::info!("Config Loaded: {:?}", config);
 
-    // config.mode = config::Mode::Tag;
+    // config.mode = config::Mode::Sniffer;
     // config.uwb_addr = 0x1234;
     // config.uwb_pan_id = 0xBEEF;
     // config.network_topology.tag_addrs[0] = 0x1234;
@@ -157,7 +157,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     )
     .unwrap();
 
-    if config.mode == config::Mode::Tag {
+    if config.mode == config::Mode::Tag && false {
         defmt::info!("Mode = TAG, starting IMU");
 
         let imu_spawner = INT_EXECUTOR_CORE_0.start(interrupt::Priority::Priority1);
@@ -196,11 +196,41 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     let cpu1_fnctn = move || {
         let spawner = INT_EXECUTOR_CORE_1.start(interrupt::Priority::Priority1);
 
-        spawner
-            .spawn(tasks::uwb_task(
-                dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000,
-            ))
-            .ok();
+        // spawner
+        //     .spawn(tasks::uwb_task(
+        //         dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000,
+        //     ))
+        //     .ok();
+
+        match &config.mode {
+            config::Mode::Anchor => {
+                defmt::info!("Mode = Anchor, starting anchor task");
+
+                spawner
+                    .spawn(tasks::uwb_anchor_task(
+                        dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000,
+                    ))
+                    .ok();
+            }
+            config::Mode::Tag => {
+                defmt::info!("Mode = Tag, starting tag task");
+
+                spawner
+                    .spawn(tasks::uwb_task(
+                        dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000,
+                    ))
+                    .ok();
+            }
+            config::Mode::Sniffer => {
+                defmt::info!("Mode = Sniffer, starting sniffer task");
+
+                spawner
+                    .spawn(tasks::uwb_sniffer(
+                        dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000,
+                    ))
+                    .ok();
+            }
+        }
 
         // Just loop to show that the main thread does not need to poll the executor.
         loop {}
