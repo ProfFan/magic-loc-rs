@@ -1,3 +1,4 @@
+use arbitrary_int::u48;
 use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_time::{Duration, Timer};
 use hal::{
@@ -42,7 +43,11 @@ pub async fn uwb_sniffer(
 
     dw3000.gpio_config(ConfigGPIOs::enable_led()).unwrap();
 
-    dw3000.ll().gpio_mode().modify(|_, w| w.msgp0(0b01)).unwrap();
+    dw3000
+        .ll()
+        .gpio_mode()
+        .modify(|_, w| w.msgp0(0b01))
+        .unwrap();
 
     dw3000
         .ll()
@@ -133,6 +138,19 @@ pub async fn uwb_sniffer(
                     frame.payload(),
                     fcs
                 );
+                if frame.payload().unwrap().len() == 6 {
+                    let mut poll_bytes: [u8; 6] = [0; 6];
+                    poll_bytes.copy_from_slice(frame.payload().unwrap());
+
+                    // Is probably a PollPacket
+                    let packet = magic_loc_protocol::packet::PollPacket::try_from(
+                        u48::from_le_bytes(poll_bytes),
+                    );
+
+                    if packet.is_ok() {
+                        defmt::info!("PollPacket: {:?}", packet);
+                    }
+                }
             }
             Err(e) => {
                 defmt::error!("Failed to parse frame: {:?}", e);

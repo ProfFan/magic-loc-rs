@@ -111,12 +111,15 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     // Load config from flash
     let config = config::load_config().await.unwrap();
 
-    // defmt::info!("Config Loaded: {:?}", config);
+    defmt::info!("Config Loaded: {:#x}", config);
 
     // config.mode = config::Mode::Sniffer;
-    // config.uwb_addr = 0x1234;
+    // config.uwb_addr = 0x2001;
     // config.uwb_pan_id = 0xBEEF;
-    // config.network_topology.tag_addrs[0] = 0x1234;
+    // config.network_topology.anchor_addrs = [
+    //     0x1001, 0x1002, 0x1003, 0x1004, 0x1005, 0x1006, 0x1007, 0x1008,
+    // ];
+    // config.network_topology.tag_addrs = [0x0001, 0x0002, 0x0003];
     // config::write_config(&config).await.unwrap();
 
     // defmt::info!("Config: {:?}", config);
@@ -208,7 +211,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
 
                 spawner
                     .spawn(tasks::uwb_anchor_task(
-                        dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000,
+                        dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000, config,
                     ))
                     .ok();
             }

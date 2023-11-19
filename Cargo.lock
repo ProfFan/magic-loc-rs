@@ -267,7 +267,7 @@ dependencies = [
 [[package]]
 name = "dw3000-ng"
 version = "0.3.1"
-source = "git+https://github.com/ProfFan/dw3000?branch=RUST#e19162bc378eb472811e2967072cbf0946eb5d4f"
+source = "git+https://github.com/ProfFan/dw3000?rev=2188edc1dfa2e3959400314752b6af7df306f5f5#2188edc1dfa2e3959400314752b6af7df306f5f5"
 dependencies = [
  "byte",
  "defmt",
@@ -799,10 +799,11 @@ dependencies = [
 [[package]]
 name = "magic-loc-protocol"
 version = "0.1.0"
-source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git#e98a6dafb880b067b5b01002d8d9b0da2365896f"
+source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git#69ecc05c0acd1452c1105b9e03072426640fd8e7"
 dependencies = [
  "array-init",
  "bilge",
+ "defmt",
  "dw3000-ng",
  "embedded-hal 0.2.7",
  "heapless",
@@ -812,6 +813,7 @@ dependencies = [
 name = "magic-loc-rs"
 version = "0.1.0"
 dependencies = [
+ "arbitrary-int",
  "binrw",
  "defmt",
  "dw3000-ng",
@@ -1232,22 +1234,22 @@ dependencies = [
 
 [[package]]
 name = "thiserror-core"
-version = "1.0.38"
+version = "1.0.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d97345f6437bb2004cd58819d8a9ef8e36cdd7661c2abc4bbde0a7c40d9f497"
+checksum = "c001ee18b7e5e3f62cbf58c7fe220119e68d902bb7443179c0c8aef30090e999"
 dependencies = [
  "thiserror-core-impl",
 ]
 
 [[package]]
 name = "thiserror-core-impl"
-version = "1.0.38"
+version = "1.0.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10ac1c5050e43014d16b2f94d0d2ce79e65ffdd8b38d8048f9c8f6a8a6da62ac"
+checksum = "e4c60d69f36615a077cc7663b9cb8e42275722d23e58a7fa3d2c7f2915d09d04"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.39",
 ]
 
 [[package]]

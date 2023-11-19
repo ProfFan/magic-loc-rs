@@ -20,11 +20,30 @@ pub enum Mode {
     Sniffer = 2,
 }
 
-#[derive(Default, Debug, Format, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 #[binrw]
 pub struct NetworkTopology {
     pub anchor_addrs: [u16; 8],
     pub tag_addrs: [u16; 3],
+}
+
+/// Implementation of custom formatter for NetworkTopology
+impl Format for NetworkTopology {
+    fn format(&self, f: defmt::Formatter) {
+        defmt::write!(f, "anchor_addrs: [");
+        let (last, other) = self.anchor_addrs.split_last().unwrap();
+        for addr in other {
+            defmt::write!(f, "{:#x}, ", addr);
+        }
+        defmt::write!(f, "{:#x}", last);
+        defmt::write!(f, "], tag_addrs: [");
+        let (last, other) = self.tag_addrs.split_last().unwrap();
+        for addr in other {
+            defmt::write!(f, "{:#x}, ", addr);
+        }
+        defmt::write!(f, "{:#x}", last);
+        defmt::write!(f, "]");
+    }
 }
 
 /// Config struct saved to flash
