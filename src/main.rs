@@ -3,6 +3,7 @@
 #![feature(type_alias_impl_trait)]
 
 mod config;
+mod operations;
 mod tasks;
 mod util;
 
@@ -220,7 +221,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
 
                 spawner
                     .spawn(tasks::uwb_task(
-                        dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000,
+                        dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000, config,
                     ))
                     .ok();
             }

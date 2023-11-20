@@ -14,7 +14,7 @@ members = ["lsm6dso"]
 #     "esp-now",
 #     "phy-enable-usb",
 # ] }
-dw3000-ng = { package = "dw3000-ng", git = "https://github.com/ProfFan/dw3000", rev = "24b52ff0a484fc628495a862f1068c10bb388046", features = [
+dw3000-ng = { package = "dw3000-ng", git = "https://github.com/ProfFan/dw3000", rev = "fb851dd495cf37242f389eea82ab9d85326f4293", features = [
     "defmt",
 ] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }

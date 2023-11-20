@@ -267,7 +267,7 @@ dependencies = [
 [[package]]
 name = "dw3000-ng"
 version = "0.3.1"
-source = "git+https://github.com/ProfFan/dw3000?rev=24b52ff0a484fc628495a862f1068c10bb388046#24b52ff0a484fc628495a862f1068c10bb388046"
+source = "git+https://github.com/ProfFan/dw3000?rev=fb851dd495cf37242f389eea82ab9d85326f4293#fb851dd495cf37242f389eea82ab9d85326f4293"
 dependencies = [
  "byte",
  "defmt",
@@ -805,7 +805,7 @@ dependencies = [
 [[package]]
 name = "magic-loc-protocol"
 version = "0.1.0"
-source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git#c08dbb5a4c20d441dabe3f449e4147e2760be9e3"
+source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git#2a87411b79783057727c3253642299da6a844334"
 dependencies = [
  "array-init",
  "bilge",
