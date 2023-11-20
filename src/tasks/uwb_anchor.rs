@@ -153,45 +153,7 @@ pub async fn uwb_anchor_task(
                 }
                 Err(e) => {
                     defmt::error!("Failed to send!");
-                    match e {
-                        dw3000_ng::Error::Spi(_) => {
-                            defmt::error!("SPI Error!");
-                        }
-                        dw3000_ng::Error::Fcs => defmt::error!("Fcs"),
-                        dw3000_ng::Error::Phy => defmt::error!("Phy"),
-                        dw3000_ng::Error::BufferTooSmall { required_len } => {
-                            defmt::error!("BufferTooSmall {}", required_len)
-                        }
-                        dw3000_ng::Error::ReedSolomon => defmt::error!("ReedSolomon"),
-                        dw3000_ng::Error::FrameWaitTimeout => defmt::error!("FrameWaitTimeout"),
-                        dw3000_ng::Error::Overrun => defmt::error!("Overrun"),
-                        dw3000_ng::Error::PreambleDetectionTimeout => {
-                            defmt::error!("PreambleDetectionTimeout")
-                        }
-                        dw3000_ng::Error::SfdTimeout => defmt::error!("SfdTimeout"),
-                        dw3000_ng::Error::FrameFilteringRejection => {
-                            defmt::error!("FrameFilteringRejection")
-                        }
-                        dw3000_ng::Error::Frame(_) => defmt::error!("Frame"),
-                        dw3000_ng::Error::DelayedSendTooLate => {
-                            defmt::error!("DelayedSendTooLate")
-                        }
-                        dw3000_ng::Error::DelayedSendPowerUpWarning => {
-                            defmt::error!("DelayedSendPowerUpWarning")
-                        }
-                        dw3000_ng::Error::Ssmarshal(_) => defmt::error!("Ssmarshal"),
-                        dw3000_ng::Error::InvalidConfiguration => {
-                            defmt::error!("InvalidConfiguration")
-                        }
-                        dw3000_ng::Error::RxNotFinished => defmt::error!("RxNotFinished"),
-                        dw3000_ng::Error::StillAsleep => defmt::error!("StillAsleep"),
-                        dw3000_ng::Error::BadRssiCalculation => {
-                            defmt::error!("BadRssiCalculation")
-                        }
-                        dw3000_ng::Error::RxConfigFrameFilteringUnsupported => {
-                            defmt::error!("RxConfigFrameFilteringUnsupported")
-                        }
-                    }
+                    defmt::error!("Error: {:?}", e);
                 }
             }
 

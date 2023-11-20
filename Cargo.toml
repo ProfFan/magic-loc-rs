@@ -14,7 +14,7 @@ members = ["lsm6dso"]
 #     "esp-now",
 #     "phy-enable-usb",
 # ] }
-dw3000-ng = { package = "dw3000-ng", git = "https://github.com/ProfFan/dw3000", rev = "2188edc1dfa2e3959400314752b6af7df306f5f5", features = [
+dw3000-ng = { package = "dw3000-ng", git = "https://github.com/ProfFan/dw3000", rev = "24b52ff0a484fc628495a862f1068c10bb388046", features = [
     "defmt",
 ] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
@@ -26,6 +26,7 @@ hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal", bra
     "embassy-executor-thread",
     "embassy-time-systick",
     "async",
+    "defmt",
 ] }
 static_cell = { version = "*", features = ["nightly"] }
 embedded-hal = "*"

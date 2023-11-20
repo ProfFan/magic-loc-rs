@@ -267,7 +267,7 @@ dependencies = [
 [[package]]
 name = "dw3000-ng"
 version = "0.3.1"
-source = "git+https://github.com/ProfFan/dw3000?rev=2188edc1dfa2e3959400314752b6af7df306f5f5#2188edc1dfa2e3959400314752b6af7df306f5f5"
+source = "git+https://github.com/ProfFan/dw3000?rev=24b52ff0a484fc628495a862f1068c10bb388046#24b52ff0a484fc628495a862f1068c10bb388046"
 dependencies = [
  "byte",
  "defmt",
@@ -277,7 +277,6 @@ dependencies = [
  "num_enum",
  "serde",
  "smoltcp",
- "ssmarshal",
 ]
 
 [[package]]
@@ -293,6 +292,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac5b3658a8ecdcddf6d3fe0967fe0843d407071e0e32aa77ed03b60c66fbecf2"
 dependencies = [
  "critical-section",
+ "defmt",
  "embassy-macros",
  "embassy-time",
 ]
@@ -302,6 +302,9 @@ name = "embassy-futures"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f878075b9794c1e4ac788c95b728f26aa6366d32eeb10c7051389f898f7d067"
+dependencies = [
+ "defmt",
+]
 
 [[package]]
 name = "embassy-macros"
@@ -323,6 +326,7 @@ checksum = "c86460434eb3defd987d872ecc1b8bc6a106a6770232180589a892721b5d8446"
 dependencies = [
  "cfg-if",
  "critical-section",
+ "defmt",
  "futures-util",
  "heapless",
 ]
@@ -375,6 +379,9 @@ name = "embedded-hal"
 version = "1.0.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2894bc2f0457b8ca3d6b8ab8aad64d9337583672494013457f86c5a9146c0e22"
+dependencies = [
+ "defmt",
+]
 
 [[package]]
 name = "embedded-hal-async"
@@ -406,6 +413,9 @@ name = "embedded-io"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
+dependencies = [
+ "defmt",
+]
 
 [[package]]
 name = "embedded-io-async"
@@ -413,6 +423,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de03527d6fb488b2d7c7a4dc81dfb6a657efe264256bfc70bb899746821666b1"
 dependencies = [
+ "defmt",
  "embedded-io 0.6.1",
 ]
 
@@ -435,12 +446,6 @@ dependencies = [
  "no-std-net",
  "serde",
 ]
-
-[[package]]
-name = "encode_unicode"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
 name = "enum-as-inner"
@@ -510,6 +515,7 @@ dependencies = [
  "bitflags 2.4.1",
  "cfg-if",
  "critical-section",
+ "defmt",
  "embassy-executor",
  "embassy-futures",
  "embassy-sync",
@@ -799,7 +805,7 @@ dependencies = [
 [[package]]
 name = "magic-loc-protocol"
 version = "0.1.0"
-source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git#69ecc05c0acd1452c1105b9e03072426640fd8e7"
+source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git#c08dbb5a4c20d441dabe3f449e4147e2760be9e3"
 dependencies = [
  "array-init",
  "bilge",
@@ -1121,16 +1127,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 dependencies = [
  "lock_api",
-]
-
-[[package]]
-name = "ssmarshal"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3e6ad23b128192ed337dfa4f1b8099ced0c2bf30d61e551b65fda5916dbb850"
-dependencies = [
- "encode_unicode",
- "serde",
 ]
 
 [[package]]
