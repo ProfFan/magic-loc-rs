@@ -14,7 +14,7 @@ members = ["lsm6dso"]
 #     "esp-now",
 #     "phy-enable-usb",
 # ] }
-dw3000-ng = { package = "dw3000-ng", git = "https://github.com/ProfFan/dw3000", rev = "fb851dd495cf37242f389eea82ab9d85326f4293", features = [
+dw3000-ng = { package = "dw3000-ng", git = "https://github.com/ProfFan/dw3000", rev = "b035f43cca4884c17bf7ab3aefea5a0d048f8f4b", features = [
     "defmt",
 ] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
@@ -75,7 +75,7 @@ embedded-svc = { version = "0.25.0", default-features = false, features = [] }
 embedded-io = "0.4.0"
 heapless = { version = "0.7.14", default-features = false }
 embassy-executor = { version = "0.3.0", features = ["nightly"] }
-embassy-time = { version = "0.1", features = ["nightly", "defmt"] }
+embassy-time = { version = "0.1.5", features = ["nightly", "defmt"] }
 
 esp-partition-table = "~0.1"
 

@@ -109,24 +109,22 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     // drop storage
     drop(storage);
 
+    // let config = config::MagicLocConfig {
+    //     mode: config::Mode::Tag,
+    //     uwb_addr: 0x0003,
+    //     uwb_pan_id: 0xBEEF,
+    //     network_topology: config::NetworkTopology {
+    //         anchor_addrs: [0x1001, 0x1002, 0x1003, 0x1004, 0x1005, 0x1006, 0x1007, 0x1008],
+    //         tag_addrs: [0x0001, 0x0002, 0x0003],
+    //     },
+    // };
+
+    // config::write_config(&config).await.unwrap();
+
     // Load config from flash
     let config = config::load_config().await.unwrap();
 
-    defmt::info!("Config Loaded: {:#x}", config);
-
-    // config.mode = config::Mode::Sniffer;
-    // config.uwb_addr = 0x2001;
-    // config.uwb_pan_id = 0xBEEF;
-    // config.network_topology.anchor_addrs = [
-    //     0x1001, 0x1002, 0x1003, 0x1004, 0x1005, 0x1006, 0x1007, 0x1008,
-    // ];
-    // config.network_topology.tag_addrs = [0x0001, 0x0002, 0x0003];
-    // config::write_config(&config).await.unwrap();
-
-    // defmt::info!("Config: {:?}", config);
-
-    // // Try read back config
-    // let config = config::load_config().await.unwrap();
+    defmt::info!("Config: {:#x}", config);
 
     interrupt::enable(Interrupt::GPIO, interrupt::Priority::Priority3).unwrap();
 

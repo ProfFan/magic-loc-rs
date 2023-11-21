@@ -85,24 +85,10 @@ pub async fn load_config() -> Option<MagicLocConfig> {
 
             return config.map_err(|_| ());
         })
-        .or_else(|_| -> Result<_, ()> {
-            defmt::info!("No config found!");
-            // Make default
-            let config = MagicLocConfig::default();
-
-            // save to flash
-            let mut buf = [0u8; MagicLocConfig::MAX_SIZE];
-            MagicLocConfig::write(&config, &mut Cursor::new(buf.as_mut_slice())).map_err(|_| ())?;
-
-            storage.write(unsafe { STORAGE_OFFSET }, &buf).unwrap();
-
-            defmt::info!("Saved default config!");
-
-            return Ok(config);
-        })
         .ok();
 }
 
+#[allow(dead_code)]
 pub async fn write_config(config: &MagicLocConfig) -> Result<(), ()> {
     let mut storage = FlashStorage::new();
 

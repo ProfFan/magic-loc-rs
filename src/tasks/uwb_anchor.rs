@@ -59,14 +59,23 @@ pub async fn uwb_anchor_task(
     Timer::after(Duration::from_millis(200)).await;
 
     // Disable SPIRDY interrupt
-    dw3000.disable_spirdy_interrupt().unwrap();
+    dw3000.disable_interrupts().unwrap();
 
     dw3000.enable_tx_interrupts().unwrap();
+    dw3000.enable_rx_interrupts().unwrap();
 
     // Calculate the time to send
     let time_frame = magic_loc_protocol::util::frame_tx_time(12, &config, true);
 
     defmt::info!("Time to send: {:?} ns", time_frame);
+
+    // Read DW3000 Device ID
+    let dev_id = dw3000.ll().dev_id().read().unwrap();
+
+    if dev_id.model() != 0x03 {
+        defmt::error!("Invalid DW3000 model: {:#x}", dev_id.model());
+        panic!();
+    }
 
     let mut fsm = AnchorSideStateMachine::new(
         node_config.uwb_addr,
@@ -75,8 +84,12 @@ pub async fn uwb_anchor_task(
     );
 
     let is_first_anchor = node_config.uwb_addr == node_config.network_topology.anchor_addrs[0];
-
-    let mut ticker = Ticker::every(Duration::from_millis(1000));
+    let my_index = node_config
+        .network_topology
+        .anchor_addrs
+        .iter()
+        .position(|&x| x == node_config.uwb_addr)
+        .unwrap();
 
     loop {
         let fsm_waiting;
@@ -84,26 +97,39 @@ pub async fn uwb_anchor_task(
             // First anchor will send the first frame
             let poll_tx_ts;
             (dw3000, poll_tx_ts) =
-                send_poll_packet(dw3000, &config, &node_config, &mut int_gpio).await;
+                send_poll_packet(dw3000, &config, &node_config, &mut int_gpio, 300 * 1000).await;
 
             defmt::info!("Poll packet sent!");
 
             fsm_waiting = fsm.waiting_for_response(poll_tx_ts.value());
         } else {
+            defmt::debug!("Waiting for poll packet from anchor 1...");
             // First wait for the poll packet from the first anchor
             let mut poll_received = false;
             while !poll_received {
                 (dw3000, poll_received) =
-                    wait_for_first_poll(dw3000, &config, &node_config, &mut int_gpio).await;
+                    wait_for_first_poll(dw3000, config, &node_config, &mut int_gpio).await;
             }
 
-            fsm_waiting = fsm.waiting_for_response(1u64);
+            defmt::info!("Poll packet from anchor 1 received!");
+
+            // Wait for the time slot to send the response
+            Timer::after(Duration::from_micros_floor(2000 * my_index as u64)).await;
+
+            // Send the poll packet
+            let poll_tx_ts;
+            (dw3000, poll_tx_ts) =
+                send_poll_packet(dw3000, &config, &node_config, &mut int_gpio, 500 * 1000).await;
+
+            defmt::info!("Response packet sent!");
+
+            fsm_waiting = fsm.waiting_for_response(poll_tx_ts.value());
         }
 
         let fsm_sending_final = fsm_waiting.sending_final();
 
         fsm = fsm_sending_final.idle();
 
-        ticker.next().await;
+        defmt::debug!("Idle!");
     }
 }
