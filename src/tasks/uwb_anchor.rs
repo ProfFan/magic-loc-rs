@@ -14,7 +14,7 @@ use magic_loc_protocol::anchor_state_machine::*;
 
 use crate::{
     config::MagicLocConfig,
-    operations::anchor::{listen_for_packet, wait_for_first_poll},
+    operations::anchor::{send_poll_packet_at, wait_for_first_poll},
 };
 
 use crate::operations::anchor::send_poll_packet;
@@ -105,8 +105,8 @@ pub async fn uwb_anchor_task(
         } else {
             defmt::debug!("Waiting for poll packet from anchor 1...");
             // First wait for the poll packet from the first anchor
-            let mut poll_received = false;
-            while !poll_received {
+            let mut poll_received = None;
+            while poll_received.is_none() {
                 (dw3000, poll_received) =
                     wait_for_first_poll(dw3000, config, &node_config, &mut int_gpio).await;
             }
@@ -114,16 +114,28 @@ pub async fn uwb_anchor_task(
             defmt::info!("Poll packet from anchor 1 received!");
 
             // Wait for the time slot to send the response
-            Timer::after(Duration::from_micros_floor(2000 * my_index as u64)).await;
+            let poll_rx_ts = poll_received.unwrap();
+            let poll_rx_ts_32 = poll_rx_ts.value().div_ceil(1 << 8);
+            let delay_ns = 1000 * 1000 * my_index as u64;
+            let delay_device = delay_ns * 64; // 64 ticks per ns
+
+            // Need to wrap around full 32-bit
+            let delay_tx_time_32 =
+                ((poll_rx_ts_32 + delay_device.div_ceil(1 << 8)) % (1 << 32)) as u32;
 
             // Send the poll packet
-            let poll_tx_ts;
-            (dw3000, poll_tx_ts) =
-                send_poll_packet(dw3000, &config, &node_config, &mut int_gpio, 500 * 1000).await;
+            dw3000 = send_poll_packet_at(
+                dw3000,
+                &config,
+                &node_config,
+                &mut int_gpio,
+                delay_tx_time_32,
+            )
+            .await;
 
             defmt::info!("Response packet sent!");
 
-            fsm_waiting = fsm.waiting_for_response(poll_tx_ts.value());
+            fsm_waiting = fsm.waiting_for_response((delay_tx_time_32 as u64) << 8);
         }
 
         let fsm_sending_final = fsm_waiting.sending_final();

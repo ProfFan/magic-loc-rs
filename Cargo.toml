@@ -18,7 +18,7 @@ dw3000-ng = { package = "dw3000-ng", git = "https://github.com/ProfFan/dw3000", 
     "defmt",
 ] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
-magic-loc-protocol = { package = "magic-loc-protocol", git = "ssh://git@github.com/ProfFan/magic-loc-protocol.git" }
+magic-loc-protocol = { package = "magic-loc-protocol", git = "ssh://git@github.com/ProfFan/magic-loc-protocol.git", rev = "633e8fa9e0ae77b0eb7ba58398a6471c05426030" }
 
 hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal", branch = "consistent-spi-timing", features = [
     "embassy",
@@ -42,11 +42,13 @@ esp-println = { git = "https://github.com/ProfFan/esp-println", branch = "fifo",
     "log",
     "defmt-espflash",
     "jtag_serial",
-    "critical-section"
+    "critical-section",
 ] }
 
 # esp-println = { version = "0.7.1", default-features = false, features = [
-esp-storage = { git = "https://github.com/esp-rs/esp-storage", branch = "main", features = ["esp32s3"] }
+esp-storage = { git = "https://github.com/esp-rs/esp-storage", branch = "main", features = [
+    "esp32s3",
+] }
 embedded-storage = "0.3.0"
 # postcard = { version = "1.0.*", features = ["use-defmt"] }
 
@@ -76,9 +78,12 @@ embedded-io = "0.4.0"
 heapless = { version = "0.7.14", default-features = false }
 embassy-executor = { version = "0.3.0", features = ["nightly"] }
 embassy-time = { version = "0.1.5", features = ["nightly", "defmt"] }
+embassy-futures = "*"
+embassy-sync = "*"
+
+scopeguard = { version = "^1.2.0", default-features = false }
 
 esp-partition-table = "~0.1"
-
 arbitrary-int = "^1.2"
 
 [profile.dev.package.esp-storage]

@@ -805,7 +805,7 @@ dependencies = [
 [[package]]
 name = "magic-loc-protocol"
 version = "0.1.0"
-source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git#bba397f60b7438fd7b1b2c77113cd96a167cd8a4"
+source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git?rev=633e8fa9e0ae77b0eb7ba58398a6471c05426030#633e8fa9e0ae77b0eb7ba58398a6471c05426030"
 dependencies = [
  "array-init",
  "bilge",
@@ -824,6 +824,8 @@ dependencies = [
  "defmt",
  "dw3000-ng",
  "embassy-executor",
+ "embassy-futures",
+ "embassy-sync",
  "embassy-time",
  "embedded-hal 0.2.7",
  "embedded-hal-async",
@@ -839,6 +841,7 @@ dependencies = [
  "heapless",
  "lsm6dso",
  "magic-loc-protocol",
+ "scopeguard",
  "serde",
  "smoltcp",
  "static_cell",
