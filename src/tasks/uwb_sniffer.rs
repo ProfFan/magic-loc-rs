@@ -119,6 +119,32 @@ pub async fn uwb_sniffer(
                         defmt::info!("PollPacket: {:?}", packet);
                     }
                 }
+                if frame.payload().unwrap().len() == 1 {
+                    let mut response_bytes: [u8; 1] = [0; 1];
+                    response_bytes.copy_from_slice(frame.payload().unwrap());
+
+                    // Is probably a ResponsePacket
+                    let packet = magic_loc_protocol::packet::ResponsePacket::try_from(
+                        u8::from_le_bytes(response_bytes),
+                    );
+
+                    if packet.is_ok() {
+                        defmt::info!("ResponsePacket: {:?}", packet);
+                    }
+                }
+                if frame.payload().unwrap().len() == 16 {
+                    let mut final_bytes: [u8; 16] = [0; 16];
+                    final_bytes.copy_from_slice(frame.payload().unwrap());
+
+                    // Is probably a FinalPacket
+                    let packet = magic_loc_protocol::packet::FinalPacket::try_from(
+                        u128::from_le_bytes(final_bytes),
+                    );
+
+                    if packet.is_ok() {
+                        defmt::info!("FinalPacket: {:?}", packet);
+                    }
+                }
             }
             Err(e) => {
                 defmt::error!("Failed to parse frame: {:?}", e);
