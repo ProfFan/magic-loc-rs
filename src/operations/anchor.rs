@@ -231,8 +231,12 @@ where
     <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
 {
     let mut poll_received: Option<Instant> = None;
-    let ready =
-        super::common::listen_for_packet(dw3000, dwm_config, &mut int_gpio, pending::<()>(), |buf, rx_ts| {
+    let ready = super::common::listen_for_packet(
+        dw3000,
+        dwm_config,
+        &mut int_gpio,
+        pending::<()>(),
+        |buf, rx_ts| {
             let frame = Ieee802154Frame::new_checked(&buf[..]);
 
             if frame.is_err() {
@@ -262,8 +266,9 @@ where
                     }
                 }
             }
-        })
-        .await;
+        },
+    )
+    .await;
 
     return (ready, poll_received);
 }

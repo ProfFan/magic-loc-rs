@@ -2,7 +2,7 @@ use core::future::pending;
 
 use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
-use embassy_time::{with_timeout, Duration, Timer, Instant};
+use embassy_time::{with_timeout, Duration, Instant, Timer};
 use hal::{
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
@@ -17,7 +17,11 @@ use smoltcp::wire::{
     Ieee802154Repr,
 };
 
-use crate::{config::MagicLocConfig, operations::tag::wait_for_poll, util::nonblocking_wait};
+use crate::{
+    config::MagicLocConfig,
+    operations::tag::{send_response_packet_at, wait_for_poll},
+    util::nonblocking_wait,
+};
 
 /// Task for the UWB Tag
 ///
@@ -90,6 +94,7 @@ pub async fn uwb_task(
         let mut waiting_poll = tag_sm.waiting_for_anchor_poll();
 
         let mut delay_ns = None;
+        let mut response_rx_timeout = None;
         let mut response_tx_slot: Option<u32> = None;
 
         while response_tx_slot.is_none() {
@@ -111,6 +116,7 @@ pub async fn uwb_task(
                     .unwrap();
                 // Set the rx time for the anchor
                 waiting_poll.set_poll_rx_ts_idx(anchor_index, rx_time.value());
+                waiting_poll.set_poll_tx_ts_idx(anchor_index, tx_time.value());
 
                 if response_tx_slot.is_none() {
                     // Calculate the response tx time
@@ -120,6 +126,9 @@ pub async fn uwb_task(
                         .iter()
                         .position(|&x| x == config.uwb_addr)
                         .unwrap();
+                    response_rx_timeout = Some(
+                        Instant::now() + Duration::from_micros(1000 * (8 - anchor_index) as u64),
+                    );
                     delay_ns = Some(1000 * 1000 * (8 + tag_index - anchor_index) as u64);
                     let delay_device = delay_ns.unwrap() * 64; // 64 ticks per ns
                     response_tx_slot = Some(
@@ -131,6 +140,7 @@ pub async fn uwb_task(
         }
 
         let delay_ns = delay_ns.unwrap();
+        let response_rx_timeout = response_rx_timeout.unwrap();
         let response_tx_slot = response_tx_slot.unwrap();
 
         defmt::info!(
@@ -140,16 +150,15 @@ pub async fn uwb_task(
         );
 
         // Continue waiting for the poll frame from the other anchors
-        let timeout_time = Instant::now() + Duration::from_micros(delay_ns.div_ceil(1000));
-        let mut last_anchor_received = false;
+        let timeout_time = response_rx_timeout;
+        let mut should_terminate = false;
 
-        while !last_anchor_received {
+        while !should_terminate {
             let timeout_future = Timer::at(timeout_time);
-            
+
             let rx_addr_time;
             (dw3000, rx_addr_time) =
-                wait_for_poll(dw3000, uwb_config, &config, &mut int_gpio, timeout_future)
-                .await;
+                wait_for_poll(dw3000, uwb_config, &config, &mut int_gpio, timeout_future).await;
 
             if let Some((rx_addr, tx_time, rx_time)) = rx_addr_time {
                 // Get the index of the anchor
@@ -163,10 +172,21 @@ pub async fn uwb_task(
                 waiting_poll.set_poll_rx_ts_idx(anchor_index, rx_time.value());
 
                 if anchor_index == config.network_topology.anchor_addrs.len() - 1 {
-                    last_anchor_received = true;
+                    should_terminate = true;
                 }
+            } else {
+                // Timeout
+                should_terminate = true;
             }
         }
+
+        // Send the response
+        dw3000.force_idle().unwrap();
+
+        let result;
+        (dw3000, result) =
+            send_response_packet_at(dw3000, uwb_config, &config, &mut int_gpio, response_tx_slot)
+                .await;
 
         let waiting_final = waiting_poll.waiting_for_anchor_final();
 
