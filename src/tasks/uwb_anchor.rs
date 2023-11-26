@@ -1,5 +1,5 @@
 use dw3000_ng::{self, hl::ConfigGPIOs};
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_time::{Duration, Instant, Ticker, Timer};
 use hal::{
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
@@ -10,7 +10,7 @@ use hal::{
 use heapless::Vec;
 
 // Protocol Crate
-use magic_loc_protocol::anchor_state_machine::*;
+use magic_loc_protocol::{anchor_state_machine::*, packet::ResponsePacket};
 
 use crate::{
     config::MagicLocConfig,
@@ -93,6 +93,18 @@ pub async fn uwb_anchor_task(
 
     loop {
         let fsm_waiting;
+
+        // If we are the first anchor, we will send the first frame
+        // Otherwise, we will wait for the first frame from the first anchor.
+        //
+        // All anchors will then wait for response packets from the tags, with a timeout
+        // of 1ms after the expected time to receive the last response packet
+
+        // The TX time for the final frame, in 32-bit DW3000 time
+        let mut final_tx_slot = 0u32;
+
+        // The deadline when we stop waiting for response packets, in system time
+        let mut response_recv_deadline = None;
         if is_first_anchor {
             // First anchor will send the first frame
             let poll_tx_ts;
@@ -101,6 +113,11 @@ pub async fn uwb_anchor_task(
 
             defmt::info!("Poll packet sent!");
 
+            let response_expected_time_us =
+                1000 * (8 + node_config.network_topology.tag_addrs.len()) as u32;
+            response_recv_deadline =
+                Some(Instant::now() + Duration::from_micros(response_expected_time_us as u64));
+            final_tx_slot = poll_tx_ts.value().div_ceil(1 << 8) as u32 + response_expected_time_us * 64;
             fsm_waiting = fsm.waiting_for_response(poll_tx_ts.value());
         } else {
             defmt::debug!("Waiting for poll packet from anchor 1...");
@@ -135,8 +152,14 @@ pub async fn uwb_anchor_task(
 
             defmt::info!("Response packet sent!");
 
+            let response_expected_time_ns =
+                1000 * 1000 * (8 - my_index + node_config.network_topology.tag_addrs.len()) as u64;
+            response_recv_deadline = (delay_tx_time_32 as u64) << 8 + response_expected_time_ns;
             fsm_waiting = fsm.waiting_for_response((delay_tx_time_32 as u64) << 8);
         }
+
+        // Wait for the response packet
+        let mut response_rx_ts: [Option<u64>; 3] = [None; 3];
 
         let fsm_sending_final = fsm_waiting.sending_final();
 

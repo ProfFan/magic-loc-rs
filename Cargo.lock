@@ -280,6 +280,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "dw3000-ng"
+version = "0.3.1"
+source = "git+https://github.com/ProfFan/dw3000?rev=ddd8db80fd166218c66de880b9aa9ef18f6dc849#ddd8db80fd166218c66de880b9aa9ef18f6dc849"
+dependencies = [
+ "byte",
+ "defmt",
+ "embedded-hal 0.2.7",
+ "fixed",
+ "nb 1.1.0",
+ "num_enum",
+ "serde",
+ "smoltcp",
+]
+
+[[package]]
 name = "either"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -810,7 +825,7 @@ dependencies = [
  "array-init",
  "bilge",
  "defmt",
- "dw3000-ng",
+ "dw3000-ng 0.3.1 (git+https://github.com/ProfFan/dw3000?rev=b035f43cca4884c17bf7ab3aefea5a0d048f8f4b)",
  "embedded-hal 0.2.7",
  "heapless",
 ]
@@ -822,7 +837,7 @@ dependencies = [
  "arbitrary-int",
  "binrw",
  "defmt",
- "dw3000-ng",
+ "dw3000-ng 0.3.1 (git+https://github.com/ProfFan/dw3000?rev=ddd8db80fd166218c66de880b9aa9ef18f6dc849)",
  "embassy-executor",
  "embassy-futures",
  "embassy-sync",
