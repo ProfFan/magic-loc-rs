@@ -272,3 +272,68 @@ where
 
     return (ready, poll_received);
 }
+
+/// Wait for the response packet from the tag
+pub async fn wait_for_response<SPI, CS>(
+    dw3000: dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+    dwm_config: dw3000_ng::Config,
+    node_config: &MagicLocConfig,
+    mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
+    cancel: impl core::future::Future,
+) -> (
+    dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+    Option<(u16, Instant)>,
+)
+where
+    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+    CS: embedded_hal::digital::v2::OutputPin,
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug + defmt::Format,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug + defmt::Format,
+    <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
+{
+    let mut response_received: Option<(u16, Instant)> = None;
+    let ready = super::common::listen_for_packet(
+        dw3000,
+        dwm_config,
+        &mut int_gpio,
+        cancel,
+        |buf, rx_ts| {
+            let frame = Ieee802154Frame::new_checked(&buf[..]);
+
+            if frame.is_err() {
+                return;
+            }
+
+            let frame = frame.unwrap();
+
+            defmt::debug!("Frame: {:?}", frame);
+
+            if let Some(src_addr) = frame.src_addr() {
+                if node_config
+                    .network_topology
+                    .tag_addrs
+                    .contains(&u16::from_le_bytes(src_addr.as_bytes().try_into().unwrap()))
+                {
+                    if let Some(payload) = frame.payload() {
+                        let response_packet = magic_loc_protocol::packet::ResponsePacket::from(
+                            u8::from_le_bytes(payload[..1].try_into().unwrap()),
+                        );
+
+                        if response_packet.packet_type()
+                            == magic_loc_protocol::packet::PacketType::Response
+                        {
+                            defmt::info!("Response packet received!");
+                            response_received = Some((
+                                u16::from_le_bytes(src_addr.as_bytes().try_into().unwrap()),
+                                rx_ts,
+                            ));
+                        }
+                    }
+                }
+            }
+        },
+    )
+    .await;
+
+    return (ready, response_received);
+}

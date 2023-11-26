@@ -14,7 +14,7 @@ use magic_loc_protocol::{anchor_state_machine::*, packet::ResponsePacket};
 
 use crate::{
     config::MagicLocConfig,
-    operations::anchor::{send_poll_packet_at, wait_for_first_poll},
+    operations::anchor::{send_poll_packet_at, wait_for_first_poll, wait_for_response},
 };
 
 use crate::operations::anchor::send_poll_packet;
@@ -115,9 +115,11 @@ pub async fn uwb_anchor_task(
 
             let response_expected_time_us =
                 1000 * (8 + node_config.network_topology.tag_addrs.len()) as u32;
-            response_recv_deadline =
-                Some(Instant::now() + Duration::from_micros(response_expected_time_us as u64));
-            final_tx_slot = poll_tx_ts.value().div_ceil(1 << 8) as u32 + response_expected_time_us * 64;
+            response_recv_deadline = Some(
+                Instant::now() + Duration::from_micros((response_expected_time_us - 300) as u64),
+            );
+            final_tx_slot = poll_tx_ts.value().div_ceil(1 << 8) as u32
+                + (response_expected_time_us * 638976 / 10).div_ceil(1 << 8);
             fsm_waiting = fsm.waiting_for_response(poll_tx_ts.value());
         } else {
             defmt::debug!("Waiting for poll packet from anchor 1...");
@@ -152,14 +154,49 @@ pub async fn uwb_anchor_task(
 
             defmt::info!("Response packet sent!");
 
-            let response_expected_time_ns =
-                1000 * 1000 * (8 - my_index + node_config.network_topology.tag_addrs.len()) as u64;
-            response_recv_deadline = (delay_tx_time_32 as u64) << 8 + response_expected_time_ns;
+            let response_expected_time_us =
+                1000 * (8 - my_index + node_config.network_topology.tag_addrs.len()) as u64;
+            response_recv_deadline = Some(
+                Instant::now() + Duration::from_micros((response_expected_time_us - 300) as u64),
+            );
+            final_tx_slot = delay_tx_time_32
+                + (response_expected_time_us * 638976 / 10).div_ceil(1 << 8) as u32;
             fsm_waiting = fsm.waiting_for_response((delay_tx_time_32 as u64) << 8);
         }
 
         // Wait for the response packet
         let mut response_rx_ts: [Option<u64>; 3] = [None; 3];
+
+        let mut response_recv_deadline = response_recv_deadline.unwrap();
+        let mut should_terminate = false;
+
+        while !should_terminate {
+            let timeout_future = Timer::at(response_recv_deadline);
+
+            let rx_addr_time;
+            (dw3000, rx_addr_time) =
+                wait_for_response(dw3000, config, &node_config, &mut int_gpio, timeout_future)
+                    .await;
+
+            if let Some((rx_addr, rx_time)) = rx_addr_time {
+                // Get the index of the anchor
+                let anchor_index = node_config
+                    .network_topology
+                    .anchor_addrs
+                    .iter()
+                    .position(|&x| x == rx_addr);
+                if let Some(anchor_index) = anchor_index {
+                    // Set the rx time for the anchor
+                    response_rx_ts[anchor_index] = Some(rx_time.value());
+
+                    if anchor_index == node_config.network_topology.anchor_addrs.len() - 1 {
+                        should_terminate = true;
+                    }
+                } else {
+                    defmt::error!("Invalid anchor address: {:X}", rx_addr);
+                }
+            }
+        }
 
         let fsm_sending_final = fsm_waiting.sending_final();
 
