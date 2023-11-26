@@ -100,9 +100,9 @@ dependencies = [
 
 [[package]]
 name = "binrw"
-version = "0.13.1"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a1b8720bedc0a503fd5c90bef3fbdc397144ac7efcc5610b30bde08083d7495"
+checksum = "34526c1f402a0a55b7eda84c5f18387e39a53c771dc2d518550105945781e4b9"
 dependencies = [
  "array-init",
  "binrw_derive",
@@ -111,9 +111,9 @@ dependencies = [
 
 [[package]]
 name = "binrw_derive"
-version = "0.13.1"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0741a1b1a70a36a1e7fb0316bba0828f6487a3b6e577353cf974b59fbbb92081"
+checksum = "60ecff568c50cae98ff31a7b5135da6c119334b598b254e6757511a1778d421b"
 dependencies = [
  "either",
  "proc-macro2",
@@ -262,21 +262,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "269924c02afd7f94bc4cecbfa5c379f6ffcf9766b3408fe63d22c728654eccd0"
 dependencies = [
  "thiserror",
-]
-
-[[package]]
-name = "dw3000-ng"
-version = "0.3.1"
-source = "git+https://github.com/ProfFan/dw3000?rev=b035f43cca4884c17bf7ab3aefea5a0d048f8f4b#b035f43cca4884c17bf7ab3aefea5a0d048f8f4b"
-dependencies = [
- "byte",
- "defmt",
- "embedded-hal 0.2.7",
- "fixed",
- "nb 1.1.0",
- "num_enum",
- "serde",
- "smoltcp",
 ]
 
 [[package]]
@@ -727,9 +712,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.14.2"
+version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f93e7192158dbcda357bdec5fb5788eebf8bbac027f3f33e719d29135ae84156"
+checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 
 [[package]]
 name = "heapless"
@@ -820,12 +805,12 @@ dependencies = [
 [[package]]
 name = "magic-loc-protocol"
 version = "0.1.0"
-source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git?rev=633e8fa9e0ae77b0eb7ba58398a6471c05426030#633e8fa9e0ae77b0eb7ba58398a6471c05426030"
+source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git?rev=19096c282827927701735d2b4fb65982f078bd5c#19096c282827927701735d2b4fb65982f078bd5c"
 dependencies = [
  "array-init",
  "bilge",
  "defmt",
- "dw3000-ng 0.3.1 (git+https://github.com/ProfFan/dw3000?rev=b035f43cca4884c17bf7ab3aefea5a0d048f8f4b)",
+ "dw3000-ng",
  "embedded-hal 0.2.7",
  "heapless",
 ]
@@ -837,7 +822,7 @@ dependencies = [
  "arbitrary-int",
  "binrw",
  "defmt",
- "dw3000-ng 0.3.1 (git+https://github.com/ProfFan/dw3000?rev=ddd8db80fd166218c66de880b9aa9ef18f6dc849)",
+ "dw3000-ng",
  "embassy-executor",
  "embassy-futures",
  "embassy-sync",
@@ -1015,9 +1000,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.69"
+version = "1.0.70"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "134c189feb4956b20f6f547d2cf727d4c0fe06722b20a0eec87ed445a97f92da"
+checksum = "39278fbbf5fb4f646ce651690877f89d1c5811a3d4acb27700c1cb3cdb78fd3b"
 dependencies = [
  "unicode-ident",
 ]
