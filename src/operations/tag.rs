@@ -40,7 +40,7 @@ where
     CANCEL: Future,
 {
     let mut poll_received: Option<(u16, u40, Instant)> = None;
-    let ready = super::common::listen_for_packet(
+    let (ready, _) = super::common::listen_for_packet(
         dw3000,
         dwm_config,
         &mut int_gpio,
@@ -94,10 +94,7 @@ pub async fn send_response_packet_at<SPI, CS, INT>(
     config: &MagicLocConfig,
     mut int_gpio: &mut INT,
     delay_tx_time: u32,
-) -> (
-    dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
-    Result<(), ()>
-)
+) -> (dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>, Result<(), ()>)
 where
     SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
     CS: embedded_hal::digital::v2::OutputPin,

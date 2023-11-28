@@ -6,7 +6,8 @@ use hal::gpio::{GpioPin, Input, PullDown};
 use arbitrary_int::{u4, u40, u48};
 
 // Protocol Crate
-use magic_loc_protocol::packet::PollPacket;
+use magic_loc_protocol::packet::{DeviceTimestamp, PollPacket};
+use zerocopy::{transmute, transmute_ref};
 
 use crate::{config::MagicLocConfig, util::nonblocking_wait};
 
@@ -231,7 +232,7 @@ where
     <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
 {
     let mut poll_received: Option<Instant> = None;
-    let ready = super::common::listen_for_packet(
+    let (ready, _) = super::common::listen_for_packet(
         dw3000,
         dwm_config,
         &mut int_gpio,
@@ -283,6 +284,7 @@ pub async fn wait_for_response<SPI, CS>(
 ) -> (
     dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
     Option<(u16, Instant)>,
+    bool,
 )
 where
     SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
@@ -292,7 +294,7 @@ where
     <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
 {
     let mut response_received: Option<(u16, Instant)> = None;
-    let ready = super::common::listen_for_packet(
+    let (ready, result) = super::common::listen_for_packet(
         dw3000,
         dwm_config,
         &mut int_gpio,
@@ -335,5 +337,100 @@ where
     )
     .await;
 
-    return (ready, response_received);
+    return (ready, response_received, result.is_err());
+}
+
+/// Send the FINAL packet
+///
+/// NOTE: This is the packet that contains the RX timestamp of the response packet
+pub async fn send_final_packet<SPI, CS>(
+    mut dw3000: dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+    dwm_config: &dw3000_ng::Config,
+    config: &MagicLocConfig,
+    mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
+    response_rx_ts: &[Option<u64>],
+    final_tx_slot: u32,
+) -> dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>
+where
+    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+    CS: embedded_hal::digital::v2::OutputPin,
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug + defmt::Format,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug + defmt::Format,
+    <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
+{
+    let final_packet = magic_loc_protocol::packet::FinalPacket::new(
+        magic_loc_protocol::packet::PacketType::Final,
+        u4::new(0),
+        core::array::from_fn(|i| u40::new(response_rx_ts[i].unwrap_or(0)).into()),
+        u40::new((final_tx_slot as u64) << 8),
+    );
+
+    let mut tx_buffer = [0u8; 64];
+
+    let packet = Ieee802154Repr {
+        frame_type: Ieee802154FrameType::Data,
+        security_enabled: false,
+        frame_pending: false,
+        ack_request: false,
+        pan_id_compression: true,
+        frame_version: Ieee802154FrameVersion::Ieee802154,
+        sequence_number: Some(1),
+        dst_pan_id: Some(Ieee802154Pan(config.uwb_pan_id)),
+        dst_addr: Some(Ieee802154Address::BROADCAST),
+        src_pan_id: None,
+        src_addr: Some(Ieee802154Address::from_bytes(
+            &config.uwb_addr.to_le_bytes(),
+        )),
+    };
+
+    let mut frame = Ieee802154Frame::new_unchecked(&mut tx_buffer);
+    packet.emit(&mut frame);
+
+    // Send the frame
+    let mac_packet_size = packet.buffer_len() + 21;
+
+    defmt::debug!("Sending frame of size: {}", mac_packet_size);
+
+    let payload = frame.payload_mut().unwrap();
+    let final_bytes: [u8; 21] = transmute!(final_packet);
+    payload[..21].copy_from_slice(&final_bytes);
+
+    let mut txing = dw3000
+        .send_raw(
+            &tx_buffer[..mac_packet_size],
+            dw3000_ng::hl::SendTime::Delayed(Instant::new((final_tx_slot as u64) << 8).unwrap()),
+            dwm_config,
+        )
+        .unwrap();
+
+    let result = nonblocking_wait(
+        || {
+            defmt::debug!("Waiting for send...");
+            txing.s_wait()
+        },
+        &mut int_gpio,
+    )
+    .await;
+
+    defmt::debug!("Current TS: {}", response_rx_ts);
+
+    match result {
+        Ok(_) => {
+            defmt::debug!("Sent!");
+        }
+        Err(e) => {
+            defmt::error!("Failed to send!");
+            defmt::error!("Error: {:?}", e);
+        }
+    }
+
+    let event_reg = txing.ll().sys_status().read().unwrap();
+
+    defmt::debug!("Should have finished, HPDWARN: {}", event_reg.hpdwarn());
+
+    txing.force_idle().unwrap(); // Seems that if we don't do this, the next send will fail
+
+    dw3000 = txing.finish_sending().unwrap();
+
+    return dw3000;
 }

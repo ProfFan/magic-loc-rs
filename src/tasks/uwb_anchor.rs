@@ -10,11 +10,13 @@ use hal::{
 use heapless::Vec;
 
 // Protocol Crate
-use magic_loc_protocol::{anchor_state_machine::*, packet::ResponsePacket};
+use magic_loc_protocol::anchor_state_machine::*;
 
 use crate::{
     config::MagicLocConfig,
-    operations::anchor::{send_poll_packet_at, wait_for_first_poll, wait_for_response},
+    operations::anchor::{
+        send_final_packet, send_poll_packet_at, wait_for_first_poll, wait_for_response,
+    },
 };
 
 use crate::operations::anchor::send_poll_packet;
@@ -101,10 +103,12 @@ pub async fn uwb_anchor_task(
         // of 1ms after the expected time to receive the last response packet
 
         // The TX time for the final frame, in 32-bit DW3000 time
-        let mut final_tx_slot = 0u32;
+        let final_tx_slot;
+
+        const GUARD_INTERVAL_US: u32 = 3000; // 3 us
 
         // The deadline when we stop waiting for response packets, in system time
-        let mut response_recv_deadline = None;
+        let response_recv_deadline;
         if is_first_anchor {
             // First anchor will send the first frame
             let poll_tx_ts;
@@ -115,11 +119,12 @@ pub async fn uwb_anchor_task(
 
             let response_expected_time_us =
                 1000 * (8 + node_config.network_topology.tag_addrs.len()) as u32;
-            response_recv_deadline = Some(
-                Instant::now() + Duration::from_micros((response_expected_time_us - 300) as u64),
-            );
-            final_tx_slot = poll_tx_ts.value().div_ceil(1 << 8) as u32
-                + (response_expected_time_us * 638976 / 10).div_ceil(1 << 8);
+            response_recv_deadline =
+                Instant::now() + Duration::from_micros(response_expected_time_us as u64);
+            final_tx_slot = (poll_tx_ts.value()
+                + ((response_expected_time_us + GUARD_INTERVAL_US) as u64 * 638976 / 10))
+                .wrapping_rem(1 << 40)
+                .div_ceil(1 << 8) as u32;
             fsm_waiting = fsm.waiting_for_response(poll_tx_ts.value());
         } else {
             defmt::debug!("Waiting for poll packet from anchor 1...");
@@ -134,13 +139,12 @@ pub async fn uwb_anchor_task(
 
             // Wait for the time slot to send the response
             let poll_rx_ts = poll_received.unwrap();
-            let poll_rx_ts_32 = poll_rx_ts.value().div_ceil(1 << 8);
-            let delay_ns = 1000 * 1000 * my_index as u64;
-            let delay_device = delay_ns * 64; // 64 ticks per ns
+            let delay_us = 1000 * my_index as u64;
+            let delay_device = delay_us * 638976 / 10;
 
             // Need to wrap around full 32-bit
             let delay_tx_time_32 =
-                ((poll_rx_ts_32 + delay_device.div_ceil(1 << 8)) % (1 << 32)) as u32;
+                ((poll_rx_ts.value() + delay_device) % (1 << 40)).div_ceil(1 << 8) as u32;
 
             // Send the poll packet
             dw3000 = send_poll_packet_at(
@@ -152,44 +156,54 @@ pub async fn uwb_anchor_task(
             )
             .await;
 
-            defmt::info!("Response packet sent!");
+            defmt::info!("Poll packet sent at {}!", (delay_tx_time_32 as u64) << 8);
 
             let response_expected_time_us =
                 1000 * (8 - my_index + node_config.network_topology.tag_addrs.len()) as u64;
-            response_recv_deadline = Some(
-                Instant::now() + Duration::from_micros((response_expected_time_us - 300) as u64),
-            );
-            final_tx_slot = delay_tx_time_32
-                + (response_expected_time_us * 638976 / 10).div_ceil(1 << 8) as u32;
+            response_recv_deadline =
+                Instant::now() + Duration::from_micros(response_expected_time_us as u64);
+
+            let response_expected_period =
+                1000 * (8 + node_config.network_topology.tag_addrs.len()) as u32;
+            final_tx_slot = (poll_rx_ts.value()
+                + ((response_expected_period + (my_index as u32) * 1000 + GUARD_INTERVAL_US) as u64 * 638976 / 10))
+                .wrapping_rem(1 << 40)
+                .div_ceil(1 << 8) as u32;
             fsm_waiting = fsm.waiting_for_response((delay_tx_time_32 as u64) << 8);
         }
 
         // Wait for the response packet
         let mut response_rx_ts: [Option<u64>; 3] = [None; 3];
-
-        let mut response_recv_deadline = response_recv_deadline.unwrap();
         let mut should_terminate = false;
 
         while !should_terminate {
             let timeout_future = Timer::at(response_recv_deadline);
 
             let rx_addr_time;
-            (dw3000, rx_addr_time) =
+            let timed_out;
+            (dw3000, rx_addr_time, timed_out) =
                 wait_for_response(dw3000, config, &node_config, &mut int_gpio, timeout_future)
                     .await;
 
+            if timed_out {
+                defmt::error!("Response packet timeout!");
+                break;
+            }
+
             if let Some((rx_addr, rx_time)) = rx_addr_time {
                 // Get the index of the anchor
-                let anchor_index = node_config
+                let tag_index = node_config
                     .network_topology
-                    .anchor_addrs
+                    .tag_addrs
                     .iter()
                     .position(|&x| x == rx_addr);
-                if let Some(anchor_index) = anchor_index {
+                if let Some(tag_index) = tag_index {
                     // Set the rx time for the anchor
-                    response_rx_ts[anchor_index] = Some(rx_time.value());
+                    response_rx_ts[tag_index] = Some(rx_time.value());
 
-                    if anchor_index == node_config.network_topology.anchor_addrs.len() - 1 {
+                    defmt::debug!("Response packet from anchor {} received!", tag_index);
+
+                    if tag_index == node_config.network_topology.anchor_addrs.len() - 1 {
                         should_terminate = true;
                     }
                 } else {
@@ -197,6 +211,25 @@ pub async fn uwb_anchor_task(
                 }
             }
         }
+
+        // Print the received response packet times
+        for (i, &rx_time) in response_rx_ts.iter().enumerate() {
+            defmt::info!("Anchor {} response time: {:?}", i, rx_time);
+        }
+
+        // Send the final packet
+
+        defmt::debug!("Sending final packet at {}!", (final_tx_slot as u64) << 8);
+
+        dw3000 = send_final_packet(
+            dw3000,
+            &config,
+            &node_config,
+            &mut int_gpio,
+            &response_rx_ts,
+            final_tx_slot,
+        )
+        .await;
 
         let fsm_sending_final = fsm_waiting.sending_final();
 

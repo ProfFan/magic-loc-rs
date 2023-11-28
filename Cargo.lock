@@ -267,7 +267,7 @@ dependencies = [
 [[package]]
 name = "dw3000-ng"
 version = "0.3.1"
-source = "git+https://github.com/ProfFan/dw3000?rev=ddd8db80fd166218c66de880b9aa9ef18f6dc849#ddd8db80fd166218c66de880b9aa9ef18f6dc849"
+source = "git+https://github.com/ProfFan/dw3000?rev=18505c516da18f498ebf66095e2f54c8fc262745#18505c516da18f498ebf66095e2f54c8fc262745"
 dependencies = [
  "byte",
  "defmt",
@@ -805,14 +805,17 @@ dependencies = [
 [[package]]
 name = "magic-loc-protocol"
 version = "0.1.0"
-source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git?rev=19096c282827927701735d2b4fb65982f078bd5c#19096c282827927701735d2b4fb65982f078bd5c"
+source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git?rev=6a5ba9cc78e3eaa86ba19ebf9d46d266504d0f5b#6a5ba9cc78e3eaa86ba19ebf9d46d266504d0f5b"
 dependencies = [
+ "arbitrary-int",
  "array-init",
  "bilge",
  "defmt",
  "dw3000-ng",
  "embedded-hal 0.2.7",
  "heapless",
+ "zerocopy",
+ "zerocopy-derive",
 ]
 
 [[package]]
@@ -845,6 +848,8 @@ dependencies = [
  "serde",
  "smoltcp",
  "static_cell",
+ "zerocopy",
+ "zerocopy-derive",
 ]
 
 [[package]]
@@ -1369,3 +1374,29 @@ dependencies = [
  "quote",
  "syn 2.0.39",
 ]
+
+[[package]]
+name = "zerocopy"
+version = "0.7.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e97e415490559a91254a2979b4829267a57d2fcd741a98eee8b722fb57289aa0"
+dependencies = [
+ "byteorder",
+ "zerocopy-derive",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.7.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd7e48ccf166952882ca8bd778a43502c64f33bf94c12ebe2a7f08e5a0f6689f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.39",
+]
+
+[[patch.unused]]
+name = "bitvec"
+version = "1.1.0"
+source = "git+https://github.com/ProfFan/bitvec?rev=44c7f97a11cb8e218a21f84fe2e7a5a6c7983cba#44c7f97a11cb8e218a21f84fe2e7a5a6c7983cba"

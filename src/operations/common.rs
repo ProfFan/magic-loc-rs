@@ -27,7 +27,7 @@ pub async fn listen_for_packet<SPI, CS, INT, CANCEL>(
     mut int_gpio: &mut INT,
     cancel: CANCEL,
     callback: impl FnOnce(&[u8], Instant),
-) -> dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>
+) -> (dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>, Result<(), ()>)
 where
     SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
     CS: embedded_hal::digital::v2::OutputPin,
@@ -46,13 +46,8 @@ where
             || {
                 defmt::trace!("Waiting for receive...");
                 let status = rxing.r_wait_buf(&mut buf);
-                defmt::trace!("SYS_STATUS:");
                 let sys_status = rxing.ll().sys_status().read().unwrap();
-                if sys_status.spierr() == 1 {
-                    // Read the SPI error status
-                    let spi_err = rxing.ll().spi_collision().read().unwrap();
-                    defmt::debug!("SPI Collision: {}", spi_err.value());
-                }
+                defmt::trace!("SYS_STATUS: {:?}", sys_status);
                 return status;
             },
             &mut int_gpio,
@@ -68,16 +63,22 @@ where
 
             rxing.force_idle().unwrap();
             dw3000 = rxing.finish_receiving().unwrap();
-            return dw3000;
+            return (dw3000, Err(()));
         }
 
         let (msg_length, rx_time) = result.unwrap();
 
         callback(&buf[..msg_length], rx_time);
+    } else {
+        defmt::debug!("Timeout waiting for packet!");
+
+        rxing.force_idle().unwrap();
+        dw3000 = rxing.finish_receiving().unwrap();
+        return (dw3000, Err(()));
     }
 
     rxing.force_idle().unwrap();
     dw3000 = rxing.finish_receiving().unwrap();
 
-    return dw3000;
+    return (dw3000, Ok(()));
 }

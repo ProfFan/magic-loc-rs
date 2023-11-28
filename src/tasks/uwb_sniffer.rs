@@ -8,7 +8,9 @@ use hal::{
     spi::{master::Spi, FullDuplexMode},
 };
 
+use magic_loc_protocol::packet::FinalPacket;
 use smoltcp::wire::Ieee802154Frame;
+use zerocopy::transmute;
 
 use crate::util::nonblocking_wait;
 
@@ -132,16 +134,15 @@ pub async fn uwb_sniffer(
                         defmt::info!("ResponsePacket: {:?}", packet);
                     }
                 }
-                if frame.payload().unwrap().len() == 16 {
-                    let mut final_bytes: [u8; 16] = [0; 16];
+                if frame.payload().unwrap().len() == 21 {
+                    let mut final_bytes: [u8; 21] = [0; 21];
                     final_bytes.copy_from_slice(frame.payload().unwrap());
 
                     // Is probably a FinalPacket
-                    let packet = magic_loc_protocol::packet::FinalPacket::try_from(
-                        u128::from_le_bytes(final_bytes),
-                    );
+                    let packet: FinalPacket = transmute!(final_bytes);
+                    let header = packet.header();
 
-                    if packet.is_ok() {
+                    if header.packet_type() == magic_loc_protocol::packet::PacketType::Final {
                         defmt::info!("FinalPacket: {:?}", packet);
                     }
                 }
