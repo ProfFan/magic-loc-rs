@@ -1,10 +1,7 @@
-use core::future::{pending, Future};
+use core::future::Future;
 
 use dw3000_ng::{self, time::Instant};
-use hal::{
-    gpio::{GpioPin, Input, PullDown},
-    macros::ram,
-};
+use hal::macros::ram;
 
 use arbitrary_int::{u4, u40, u48};
 
@@ -188,7 +185,8 @@ pub async fn wait_for_final<SPI, CS, INT, CANCEL>(
     cancel: CANCEL,
 ) -> (
     dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
-    Option<(u16, FinalPacket, Instant)>, bool,
+    Option<(u16, FinalPacket, Instant)>,
+    bool,
 )
 where
     SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,

@@ -1,5 +1,3 @@
-use core::future::Future;
-
 use embassy_sync::blocking_mutex::raw::RawMutex;
 /// Wait on a function that returns `nb::Result` asynchronously.
 ///
@@ -28,6 +26,7 @@ use hal::prelude::nb;
 ///
 /// When `f` returns `nb::Error::WouldBlock`, this function will wait for
 /// the GPIO output to go high, and then call `f` again.
+#[allow(dead_code)]
 #[inline]
 pub async fn nonblocking_wait_cancellable<T, E, MUTEX>(
     mut f: impl FnMut() -> Result<T, nb::Error<E>>,

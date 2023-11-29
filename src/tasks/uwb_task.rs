@@ -1,8 +1,7 @@
 use core::future::pending;
 
 use dw3000_ng::{self, hl::ConfigGPIOs};
-use embassy_sync::blocking_mutex::raw::NoopRawMutex;
-use embassy_time::{with_timeout, Duration, Instant, Timer};
+use embassy_time::{Duration, Instant, Timer};
 use hal::{
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
@@ -12,16 +11,10 @@ use hal::{
 
 use heapless::Vec;
 use magic_loc_protocol::tag_state_machine::TagSideStateMachine;
-use serde::de;
-use smoltcp::wire::{
-    Ieee802154Address, Ieee802154Frame, Ieee802154FrameType, Ieee802154FrameVersion, Ieee802154Pan,
-    Ieee802154Repr,
-};
 
 use crate::{
     config::MagicLocConfig,
-    operations::tag::{self, send_response_packet_at, wait_for_final, wait_for_poll},
-    util::nonblocking_wait,
+    operations::tag::{send_response_packet_at, wait_for_final, wait_for_poll},
 };
 
 /// Task for the UWB Tag
@@ -178,6 +171,7 @@ pub async fn uwb_task(
                     .unwrap();
                 // Set the rx time for the anchor
                 waiting_poll.set_poll_rx_ts_idx(anchor_index, rx_time.value());
+                waiting_poll.set_poll_tx_ts_idx(anchor_index, tx_time.value());
 
                 if anchor_index == config.network_topology.anchor_addrs.len() - 1 {
                     should_terminate = true;
@@ -215,7 +209,7 @@ pub async fn uwb_task(
             Instant::now() + Duration::from_micros(last_final_expected_timeout as u64);
 
         // Wait for the final frame from the anchors
-        while true {
+        loop {
             let timeout_future = Timer::at(timeout_time);
 
             let (result, recv_ok);
@@ -242,7 +236,10 @@ pub async fn uwb_task(
                 .set_response_rx_ts(rx_addr, packet.rx_timestamps[my_index].value().value());
         }
 
-        defmt::info!("All done, response_rx_ts = {:?}", waiting_final.response_rx_ts);
+        defmt::info!(
+            "All done, response_rx_ts = {:?}",
+            waiting_final.response_rx_ts
+        );
 
         tag_sm = waiting_final.idle();
     }

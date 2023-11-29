@@ -1,23 +1,11 @@
-use core::{future::Future, result};
+use core::future::Future;
 
 use dw3000_ng::{self, time::Instant};
 use embassy_futures::select::{select, Either};
-use hal::{
-    gpio::{GpioPin, Input, PullDown},
-    macros::ram,
-};
-
-use arbitrary_int::{u4, u40, u48};
+use hal::macros::ram;
 
 // Protocol Crate
-use magic_loc_protocol::packet::PollPacket;
-
-use crate::{config::MagicLocConfig, util::nonblocking_wait};
-
-use smoltcp::wire::{
-    Ieee802154Address, Ieee802154Frame, Ieee802154FrameType, Ieee802154FrameVersion, Ieee802154Pan,
-    Ieee802154Repr,
-};
+use crate::util::nonblocking_wait;
 
 /// Listen for a packet with a callback function
 #[ram]

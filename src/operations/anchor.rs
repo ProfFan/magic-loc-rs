@@ -6,8 +6,8 @@ use hal::gpio::{GpioPin, Input, PullDown};
 use arbitrary_int::{u4, u40, u48};
 
 // Protocol Crate
-use magic_loc_protocol::packet::{DeviceTimestamp, PollPacket};
-use zerocopy::{transmute, transmute_ref};
+use magic_loc_protocol::packet::PollPacket;
+use zerocopy::transmute;
 
 use crate::{config::MagicLocConfig, util::nonblocking_wait};
 

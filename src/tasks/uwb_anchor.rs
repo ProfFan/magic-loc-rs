@@ -1,5 +1,5 @@
 use dw3000_ng::{self, hl::ConfigGPIOs};
-use embassy_time::{Duration, Instant, Ticker, Timer};
+use embassy_time::{Duration, Instant, Timer};
 use hal::{
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
