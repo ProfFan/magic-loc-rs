@@ -12,6 +12,7 @@ use hal::{
 
 use heapless::Vec;
 use magic_loc_protocol::tag_state_machine::TagSideStateMachine;
+use serde::de;
 use smoltcp::wire::{
     Ieee802154Address, Ieee802154Frame, Ieee802154FrameType, Ieee802154FrameVersion, Ieee802154Pan,
     Ieee802154Repr,
@@ -19,7 +20,7 @@ use smoltcp::wire::{
 
 use crate::{
     config::MagicLocConfig,
-    operations::tag::{send_response_packet_at, wait_for_poll},
+    operations::tag::{self, send_response_packet_at, wait_for_final, wait_for_poll},
     util::nonblocking_wait,
 };
 
@@ -89,6 +90,13 @@ pub async fn uwb_task(
         Vec::from_slice(&config.network_topology.anchor_addrs).unwrap(),
         Vec::from_slice(&config.network_topology.tag_addrs).unwrap(),
     );
+
+    let my_index: usize = config
+        .network_topology
+        .tag_addrs
+        .iter()
+        .position(|&x| x == config.uwb_addr)
+        .unwrap();
 
     loop {
         let mut waiting_poll = tag_sm.waiting_for_anchor_poll();
@@ -188,7 +196,53 @@ pub async fn uwb_task(
             send_response_packet_at(dw3000, uwb_config, &config, &mut int_gpio, response_tx_slot)
                 .await;
 
-        let waiting_final = waiting_poll.waiting_for_anchor_final();
+        if let Err(_) = result {
+            defmt::error!("Response send fail!");
+
+            tag_sm = waiting_poll.waiting_for_anchor_final().idle();
+            continue;
+        }
+
+        let mut waiting_final = waiting_poll.waiting_for_anchor_final();
+
+        const GUARD_INTERVAL_US: u32 = 10 * 1000; // 3ms
+        let last_final_expected_timeout = 1000
+            * (config.network_topology.tag_addrs.len() - my_index
+                + config.network_topology.anchor_addrs.len()) as u32
+            + GUARD_INTERVAL_US;
+
+        let timeout_time =
+            Instant::now() + Duration::from_micros(last_final_expected_timeout as u64);
+
+        // Wait for the final frame from the anchors
+        while true {
+            let timeout_future = Timer::at(timeout_time);
+
+            let (result, recv_ok);
+            (dw3000, result, recv_ok) =
+                wait_for_final(dw3000, uwb_config, &config, &mut int_gpio, timeout_future).await;
+
+            if !recv_ok {
+                // Timeout
+                defmt::error!("Final frame timeout!");
+                break;
+            }
+
+            if result.is_none() {
+                // Not my frame
+                defmt::debug!("Not my frame!");
+                continue;
+            }
+
+            let (rx_addr, packet, rx_time) = result.unwrap();
+
+            waiting_final.set_final_tx_ts(rx_addr, packet.tx_timestamp.value().value());
+            waiting_final.set_final_rx_ts(rx_addr, rx_time.value());
+            waiting_final
+                .set_response_rx_ts(rx_addr, packet.rx_timestamps[my_index].value().value());
+        }
+
+        defmt::info!("All done, response_rx_ts = {:?}", waiting_final.response_rx_ts);
 
         tag_sm = waiting_final.idle();
     }

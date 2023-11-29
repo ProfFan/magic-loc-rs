@@ -117,8 +117,9 @@ pub async fn uwb_anchor_task(
 
             defmt::info!("Poll packet sent!");
 
-            let response_expected_time_us =
-                1000 * (8 + node_config.network_topology.tag_addrs.len()) as u32;
+            let response_expected_time_us = 1000
+                * (node_config.network_topology.anchor_addrs.len()
+                    + node_config.network_topology.tag_addrs.len()) as u32;
             response_recv_deadline =
                 Instant::now() + Duration::from_micros(response_expected_time_us as u64);
             final_tx_slot = (poll_tx_ts.value()
@@ -158,15 +159,21 @@ pub async fn uwb_anchor_task(
 
             defmt::info!("Poll packet sent at {}!", (delay_tx_time_32 as u64) << 8);
 
-            let response_expected_time_us =
-                1000 * (8 - my_index + node_config.network_topology.tag_addrs.len()) as u64;
+            let response_expected_time_us = 1000
+                * (node_config.network_topology.anchor_addrs.len() - my_index
+                    + node_config.network_topology.tag_addrs.len()) as u64;
             response_recv_deadline =
                 Instant::now() + Duration::from_micros(response_expected_time_us as u64);
 
-            let response_expected_period =
-                1000 * (8 + node_config.network_topology.tag_addrs.len()) as u32;
+            // We use this because this would be more accurate than using our tx time
+            let response_expected_period = 1000
+                * (node_config.network_topology.anchor_addrs.len()
+                    + node_config.network_topology.tag_addrs.len()) as u32;
             final_tx_slot = (poll_rx_ts.value()
-                + ((response_expected_period + (my_index as u32) * 1000 + GUARD_INTERVAL_US) as u64 * 638976 / 10))
+                + ((response_expected_period + (my_index as u32) * 1000 + GUARD_INTERVAL_US)
+                    as u64
+                    * 638976
+                    / 10))
                 .wrapping_rem(1 << 40)
                 .div_ceil(1 << 8) as u32;
             fsm_waiting = fsm.waiting_for_response((delay_tx_time_32 as u64) << 8);

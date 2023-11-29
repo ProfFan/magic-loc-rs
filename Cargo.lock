@@ -805,7 +805,7 @@ dependencies = [
 [[package]]
 name = "magic-loc-protocol"
 version = "0.1.0"
-source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git?rev=6a5ba9cc78e3eaa86ba19ebf9d46d266504d0f5b#6a5ba9cc78e3eaa86ba19ebf9d46d266504d0f5b"
+source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git?rev=576de45d0ae465259c2ff65336682de7dc2248c8#576de45d0ae465259c2ff65336682de7dc2248c8"
 dependencies = [
  "arbitrary-int",
  "array-init",

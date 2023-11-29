@@ -18,7 +18,7 @@ dw3000-ng = { package = "dw3000-ng", git = "https://github.com/ProfFan/dw3000", 
     "defmt",
 ] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
-magic-loc-protocol = { package = "magic-loc-protocol", git = "ssh://git@github.com/ProfFan/magic-loc-protocol.git", rev = "6a5ba9cc78e3eaa86ba19ebf9d46d266504d0f5b" }
+magic-loc-protocol = { package = "magic-loc-protocol", git = "ssh://git@github.com/ProfFan/magic-loc-protocol.git", rev = "576de45d0ae465259c2ff65336682de7dc2248c8" }
 
 hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal", branch = "consistent-spi-timing", features = [
     "embassy",
