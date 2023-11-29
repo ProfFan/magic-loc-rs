@@ -68,7 +68,7 @@ pub async fn load_config() -> Option<MagicLocConfig> {
 
     let mut buf = [0u8; MagicLocConfig::MAX_SIZE];
 
-    return storage
+    storage
         .read(unsafe { STORAGE_OFFSET }, &mut buf)
         .map_err(|_| ())
         .and_then(|_| -> Result<MagicLocConfig, ()> {
@@ -83,9 +83,9 @@ pub async fn load_config() -> Option<MagicLocConfig> {
                 return Err(());
             }
 
-            return config.map_err(|_| ());
+            config.map_err(|_| ())
         })
-        .ok();
+        .ok()
 }
 
 #[allow(dead_code)]

@@ -64,7 +64,7 @@ where
                     .anchor_addrs
                     .iter()
                     .position(|&x| x == src_addr);
-                if let Some(_) = index_anchor {
+                if index_anchor.is_some() {
                     if let Some(payload) = frame.payload() {
                         let poll_packet = magic_loc_protocol::packet::PollPacket::from(
                             u48::from_le_bytes(payload[..6].try_into().unwrap()),

@@ -1,5 +1,5 @@
 use dw3000_ng::{self, hl::ConfigGPIOs};
-use embassy_time::{Duration, Instant, Timer};
+use embassy_time::{Duration, Instant, Ticker, Timer};
 use hal::{
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
@@ -93,7 +93,11 @@ pub async fn uwb_anchor_task(
         .position(|&x| x == node_config.uwb_addr)
         .unwrap();
 
+    let mut ticker = Ticker::every(Duration::from_millis(500));
+
     loop {
+        ticker.next().await;
+
         let fsm_waiting;
 
         // If we are the first anchor, we will send the first frame
@@ -105,7 +109,7 @@ pub async fn uwb_anchor_task(
         // The TX time for the final frame, in 32-bit DW3000 time
         let final_tx_slot;
 
-        const GUARD_INTERVAL_US: u32 = 3000; // 3 us
+        const GUARD_INTERVAL_US: u32 = 3000; // 3 ms
 
         // The deadline when we stop waiting for response packets, in system time
         let response_recv_deadline;

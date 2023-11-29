@@ -106,7 +106,7 @@ where
         let mut write_buffer: [u8; R::LEN] = [0u8; R::LEN];
 
         init_header::<R>(false, &mut write_buffer);
-        async_spi::SpiBus::transfer(&mut self.0.bus, &mut buffer, &write_buffer)
+        async_spi::SpiBus::transfer(&mut self.0.bus, buffer, &write_buffer)
             .await
             .map_err(|e| Error::Transfer(e))?;
 

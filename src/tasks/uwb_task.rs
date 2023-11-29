@@ -95,7 +95,7 @@ pub async fn uwb_task(
         let mut waiting_poll = tag_sm.waiting_for_anchor_poll();
 
         let mut delay_ns = None;
-        let mut response_rx_timeout = None;
+        let mut poll_rx_timeout = None;
         let mut response_tx_slot: Option<u32> = None;
 
         while response_tx_slot.is_none() {
@@ -127,7 +127,7 @@ pub async fn uwb_task(
                         .iter()
                         .position(|&x| x == config.uwb_addr)
                         .unwrap();
-                    response_rx_timeout = Some(
+                    poll_rx_timeout = Some(
                         Instant::now() + Duration::from_micros(1000 * (8 - anchor_index) as u64),
                     );
                     delay_ns = Some(1000 * 1000 * (8 + tag_index - anchor_index) as u64);
@@ -141,7 +141,7 @@ pub async fn uwb_task(
         }
 
         let delay_ns = delay_ns.unwrap();
-        let response_rx_timeout = response_rx_timeout.unwrap();
+        let poll_rx_timeout = poll_rx_timeout.unwrap();
         let response_tx_slot = response_tx_slot.unwrap();
 
         defmt::info!(
@@ -151,7 +151,7 @@ pub async fn uwb_task(
         );
 
         // Continue waiting for the poll frame from the other anchors
-        let timeout_time = response_rx_timeout;
+        let timeout_time = poll_rx_timeout;
         let mut should_terminate = false;
 
         while !should_terminate {
@@ -190,16 +190,19 @@ pub async fn uwb_task(
             send_response_packet_at(dw3000, uwb_config, &config, &mut int_gpio, response_tx_slot)
                 .await;
 
-        if let Err(_) = result {
+        if result.is_err() {
             defmt::error!("Response send fail!");
 
             tag_sm = waiting_poll.waiting_for_anchor_final().idle();
             continue;
         }
 
+        // Set the response tx time
+        waiting_poll.response_tx_ts = (response_tx_slot as u64) << 8;
+
         let mut waiting_final = waiting_poll.waiting_for_anchor_final();
 
-        const GUARD_INTERVAL_US: u32 = 10 * 1000; // 3ms
+        const GUARD_INTERVAL_US: u32 = 3 * 1000; // 3ms
         let last_final_expected_timeout = 1000
             * (config.network_topology.tag_addrs.len() - my_index
                 + config.network_topology.anchor_addrs.len()) as u32
@@ -234,12 +237,61 @@ pub async fn uwb_task(
             waiting_final.set_final_rx_ts(rx_addr, rx_time.value());
             waiting_final
                 .set_response_rx_ts(rx_addr, packet.rx_timestamps[my_index].value().value());
+
+            if rx_addr == *config.network_topology.anchor_addrs.last().unwrap() {
+                // This is the last frame
+                break;
+            }
         }
 
         defmt::info!(
             "All done, response_rx_ts = {:?}",
             waiting_final.response_rx_ts
         );
+
+        // Calculate the TWR to all anchors using AltDS-TWR Formula
+        let mut twr_results: [f64; 8] = [core::f64::NEG_INFINITY; 8];
+        for i in 0..8 {
+            if waiting_final.response_rx_ts[i] == 0 {
+                continue;
+            }
+            const SEC_PER_TICK: f64 = 1.0 / 499200000.0 / 128.0;
+            const C_LIGHT: f64 = 299792458.0; // m/s
+
+            let t1 = waiting_final.poll_tx_ts[i] as i64;
+            let t2 = waiting_final.poll_rx_ts[i] as i64;
+            let t3 = waiting_final.response_tx_ts as i64;
+            let t4 = waiting_final.response_rx_ts[i] as i64;
+            let t5 = waiting_final.final_tx_ts[i] as i64;
+            let t6 = waiting_final.final_rx_ts[i] as i64;
+
+            defmt::debug!(
+                "t1 = {}, t2 = {}, t3 = {}, t4 = {}, t5 = {}, t6 = {}",
+                t1,
+                t2,
+                t3,
+                t4,
+                t5,
+                t6
+            );
+
+            #[allow(non_snake_case)]
+            {
+                let R_a_hat = (t4 - t1).rem_euclid(1 << 40) as i128;
+                let D_a_hat = (t3 - t2).rem_euclid(1 << 40) as i128;
+                let R_b_hat = (t6 - t3).rem_euclid(1 << 40) as i128;
+                let D_b_hat = (t5 - t4).rem_euclid(1 << 40) as i128;
+
+                let tof_ticks = (R_a_hat * R_b_hat - D_a_hat * D_b_hat)
+                    / (R_a_hat + R_b_hat + D_a_hat + D_b_hat);
+                let tof = tof_ticks as f64 * SEC_PER_TICK;
+                let dist = tof * C_LIGHT;
+
+                twr_results[i] = dist;
+            }
+        }
+
+        defmt::info!("TWR Results = {:?}", twr_results);
 
         tag_sm = waiting_final.idle();
     }

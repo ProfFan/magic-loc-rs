@@ -37,7 +37,7 @@ where
     let mut poll_packet = PollPacket::new(
         magic_loc_protocol::packet::PacketType::Poll,
         u4::new(0),
-        u40::new(0x12356789).into(),
+        u40::new(0x12356789),
     );
 
     let mut tx_buffer = [0u8; 128];
@@ -111,7 +111,7 @@ where
 
     dw3000 = txing.finish_sending().unwrap();
 
-    return dw3000;
+    dw3000
 }
 
 pub async fn send_poll_packet<SPI, CS>(
@@ -131,7 +131,7 @@ where
     let mut poll_packet = PollPacket::new(
         magic_loc_protocol::packet::PacketType::Poll,
         u4::new(0),
-        u40::new(0x12356789).into(),
+        u40::new(0x12356789),
     );
 
     let mut tx_buffer = [0u8; 128];
@@ -211,7 +211,7 @@ where
 
     dw3000 = txing.finish_sending().unwrap();
 
-    return (dw3000, delayed_tx_time);
+    (dw3000, delayed_tx_time)
 }
 
 /// Wait for the first poll packet from the first anchor to arrive
@@ -238,7 +238,7 @@ where
         &mut int_gpio,
         pending::<()>(),
         |buf, rx_ts| {
-            let frame = Ieee802154Frame::new_checked(&buf[..]);
+            let frame = Ieee802154Frame::new_checked(buf);
 
             if frame.is_err() {
                 return;
@@ -300,7 +300,7 @@ where
         &mut int_gpio,
         cancel,
         |buf, rx_ts| {
-            let frame = Ieee802154Frame::new_checked(&buf[..]);
+            let frame = Ieee802154Frame::new_checked(buf);
 
             if frame.is_err() {
                 return;
@@ -432,5 +432,5 @@ where
 
     dw3000 = txing.finish_sending().unwrap();
 
-    return dw3000;
+    dw3000
 }
