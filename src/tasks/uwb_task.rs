@@ -132,9 +132,11 @@ pub async fn uwb_task(
                     );
                     delay_ns = Some(1000 * 1000 * (8 + tag_index - anchor_index) as u64);
                     let delay_device = delay_ns.unwrap() * 64; // 64 ticks per ns
+
+                    // NOTE: the last bit of the tx time is always 0 as it is ignored by the DW3000
                     response_tx_slot = Some(
-                        ((rx_time.value().div_ceil(1 << 8) + delay_device.div_ceil(1 << 8))
-                            % (1 << 32)) as u32,
+                        (((rx_time.value() + delay_device).div_ceil(1 << 9) << 1) % (1 << 32))
+                            as u32,
                     )
                 }
             }
@@ -144,7 +146,7 @@ pub async fn uwb_task(
         let poll_rx_timeout = poll_rx_timeout.unwrap();
         let response_tx_slot = response_tx_slot.unwrap();
 
-        defmt::info!(
+        defmt::debug!(
             "Response delay = {}ns, tx slot = {}",
             delay_ns,
             response_tx_slot
@@ -244,7 +246,7 @@ pub async fn uwb_task(
             }
         }
 
-        defmt::info!(
+        defmt::debug!(
             "All done, response_rx_ts = {:?}",
             waiting_final.response_rx_ts
         );
@@ -282,6 +284,14 @@ pub async fn uwb_task(
                 let R_b_hat = (t6 - t3).rem_euclid(1 << 40) as i128;
                 let D_b_hat = (t5 - t4).rem_euclid(1 << 40) as i128;
 
+                defmt::debug!(
+                    "R_a_hat = {}, D_a_hat = {}, R_b_hat = {}, D_b_hat = {}",
+                    R_a_hat,
+                    D_a_hat,
+                    R_b_hat,
+                    D_b_hat
+                );
+
                 let tof_ticks = (R_a_hat * R_b_hat - D_a_hat * D_b_hat)
                     / (R_a_hat + R_b_hat + D_a_hat + D_b_hat);
                 let tof = tof_ticks as f64 * SEC_PER_TICK;
@@ -292,6 +302,9 @@ pub async fn uwb_task(
         }
 
         defmt::info!("TWR Results = {:?}", twr_results);
+
+        // clear waiting_final.response_rx_ts
+        waiting_final.response_rx_ts.fill(0);
 
         tag_sm = waiting_final.idle();
     }

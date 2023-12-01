@@ -163,9 +163,9 @@ where
     let current_ts = Instant::new((dw3000.sys_time().unwrap() as u64) << 8).unwrap();
 
     // Round to 32-bit
-    let mut delay = dw3000_ng::time::Duration::from_nanos(delay_ns);
-    delay = dw3000_ng::time::Duration::new((delay.value() >> 8) << 8).unwrap();
-    let delayed_tx_time = current_ts + delay;
+    let delay = dw3000_ng::time::Duration::from_nanos(delay_ns);
+    let delayed_tx_time_unrounded = (current_ts + delay).value() % (1 << 40);
+    let delayed_tx_time = Instant::new((delayed_tx_time_unrounded >> 9) << 9).unwrap();
 
     // Set the delayed send time
     poll_packet.set_tx_timestamp(u40::new(delayed_tx_time.value()));
