@@ -95,7 +95,7 @@ pub async fn uwb_anchor_task(
 
     let mut ticker;
 
-    ticker = Ticker::every(Duration::from_millis(100));
+    ticker = Ticker::every(Duration::from_millis(40));
 
     loop {
         let fsm_waiting;
