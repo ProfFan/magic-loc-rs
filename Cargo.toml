@@ -37,7 +37,7 @@ esp-backtrace = { version = "0.9.0", default-features = false, features = [
     "exception-handler",
     "print-jtag-serial",
 ] }
-esp-println = { git = "https://github.com/ProfFan/esp-println", branch = "fifo", default-features = false, features = [
+esp-println = { git = "https://github.com/esp-rs/esp-println", branch = "main", default-features = false, features = [
     "esp32s3",
     "log",
     "defmt-espflash",

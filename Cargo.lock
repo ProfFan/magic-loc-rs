@@ -576,7 +576,7 @@ checksum = "678ad508e8e61561eccee27003a5033901fe07fe8700508c324849b3df930ef5"
 [[package]]
 name = "esp-println"
 version = "0.7.1"
-source = "git+https://github.com/ProfFan/esp-println?branch=fifo#57409b268f8fe6c5d548aa3f8b24ca6dfeb86701"
+source = "git+https://github.com/esp-rs/esp-println?branch=main#200426258a298168acc413e586dcee4af9951943"
 dependencies = [
  "critical-section",
  "defmt",
@@ -838,7 +838,7 @@ dependencies = [
  "esp-alloc",
  "esp-backtrace",
  "esp-partition-table",
- "esp-println 0.7.1 (git+https://github.com/ProfFan/esp-println?branch=fifo)",
+ "esp-println 0.7.1 (git+https://github.com/esp-rs/esp-println?branch=main)",
  "esp-storage",
  "esp32s3-hal",
  "heapless",
