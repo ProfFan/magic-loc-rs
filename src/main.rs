@@ -33,7 +33,7 @@ use hal::{
     peripherals::{Interrupt, Peripherals, I2C0, SPI2},
     prelude::*,
     spi::{FullDuplexMode, SpiMode},
-    IO, UsbSerialJtag,
+    UsbSerialJtag, IO,
 };
 
 // Stack for the second core
@@ -164,7 +164,9 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     // Enable the serial task
     let serial_jtag = UsbSerialJtag::new(peripherals.USB_DEVICE);
 
-    core0_spawner.spawn(tasks::serial_comm_task(serial_jtag)).ok();
+    core0_spawner
+        .spawn(tasks::serial_comm_task(serial_jtag))
+        .ok();
 
     if config.mode == config::Mode::Tag && false {
         defmt::info!("Mode = TAG, starting IMU");
