@@ -78,6 +78,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bbqueue"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd3baa8859d1a4c7411039a75c0599a4640ef1c9a8fc811e4325b00e6cfe0a55"
+
+[[package]]
 name = "bilge"
 version = "0.2.0"
 source = "git+https://github.com/hecatia-elegua/bilge#41843c8ca12ca1da7db1064cee2154d2d7edc440"
@@ -847,6 +853,7 @@ name = "magic-loc-rs"
 version = "0.1.0"
 dependencies = [
  "arbitrary-int",
+ "bbqueue",
  "binrw",
  "critical-section",
  "defmt",
@@ -857,7 +864,8 @@ dependencies = [
  "embassy-time",
  "embedded-hal 0.2.7",
  "embedded-hal-async",
- "embedded-io 0.4.0",
+ "embedded-io 0.6.1",
+ "embedded-io-async",
  "embedded-storage",
  "embedded-svc",
  "esp-alloc",
