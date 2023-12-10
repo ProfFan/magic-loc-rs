@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 embedded-hal = "0.2.*"
-embedded-hal-async = { version = "=1.0.0-rc.1", optional = true }
+embedded-hal-async = { version = "=1.0.0-rc.2", optional = true }
 log = { version = "0.4.18" }
 defmt = "*"
 

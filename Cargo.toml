@@ -20,7 +20,7 @@ dw3000-ng = { package = "dw3000-ng", git = "https://github.com/ProfFan/dw3000", 
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
 magic-loc-protocol = { package = "magic-loc-protocol", git = "ssh://git@github.com/ProfFan/magic-loc-protocol.git", rev = "3fb1f311063ecaf0b535cda94359ef76834a6f8e" }
 
-hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal", branch = "consistent-spi-timing", features = [
+hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal", rev = "67afd5e102be98a8ef50200fe8ef7a5b29147adc", features = [
     "embassy",
     "embassy-executor-interrupt",
     "embassy-executor-thread",
@@ -30,7 +30,7 @@ hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal", bra
 ] }
 static_cell = { version = "*", features = ["nightly"] }
 embedded-hal = "*"
-embedded-hal-async = "=1.0.0-rc.1"
+embedded-hal-async = "=1.0.0-rc.2"
 esp-backtrace = { version = "0.9.0", default-features = false, features = [
     "esp32s3",
     "panic-handler",
@@ -40,7 +40,7 @@ esp-backtrace = { version = "0.9.0", default-features = false, features = [
 esp-println = { git = "https://github.com/esp-rs/esp-println", branch = "main", default-features = false, features = [
     "esp32s3",
     "log",
-    "defmt-espflash",
+    # "defmt-espflash",
     "jtag_serial",
     "critical-section",
 ] }
@@ -58,6 +58,8 @@ serde = { version = "1.0.*", default-features = false }
 binrw = { version = "0.13.1", default-features = false }
 zerocopy = "0.X"
 zerocopy-derive = "0.X"
+
+critical-section = { version = "1.1.2", default-features = false }
 
 # log = { version = "0.4.18" }
 defmt = { package = "defmt", version = "*", features = ["encoding-rzcobs"] }
@@ -77,9 +79,9 @@ smoltcp = { version = "0.10.0", default-features = false, features = [
 ] }
 embedded-svc = { version = "0.25.0", default-features = false, features = [] }
 embedded-io = "0.4.0"
-heapless = { version = "0.7.14", default-features = false }
-embassy-executor = { version = "0.3.0", features = ["nightly"] }
-embassy-time = { version = "0.1.5", features = ["nightly", "defmt"] }
+heapless = { version = "0.7.16", default-features = false }
+embassy-executor = { version = "0.4.0", features = ["nightly"] }
+embassy-time = { version = "0.2.0", features = ["defmt"] }
 embassy-futures = "*"
 embassy-sync = "*"
 
