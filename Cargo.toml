@@ -93,12 +93,6 @@ scopeguard = { version = "^1.2.0", default-features = false }
 esp-partition-table = "~0.1"
 arbitrary-int = "^1.2"
 
-[patch.crates-io]
-bitvec = { git = "https://github.com/ProfFan/bitvec", rev = "44c7f97a11cb8e218a21f84fe2e7a5a6c7983cba", features = [
-    "serde",
-    "alloc",
-] }
-
 [profile.dev.package.esp-storage]
 opt-level = 3
 

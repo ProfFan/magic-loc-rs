@@ -102,7 +102,7 @@ where
         [(); R::LEN]: Sized,
     {
         let mut r = R::read();
-        let mut buffer = R::buffer(&mut r);
+        let buffer = R::buffer(&mut r);
         let mut write_buffer: [u8; R::LEN] = [0u8; R::LEN];
 
         init_header::<R>(false, &mut write_buffer);

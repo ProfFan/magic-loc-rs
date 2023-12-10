@@ -1460,8 +1460,3 @@ dependencies = [
  "quote",
  "syn 2.0.39",
 ]
-
-[[patch.unused]]
-name = "bitvec"
-version = "1.1.0"
-source = "git+https://github.com/ProfFan/bitvec?rev=44c7f97a11cb8e218a21f84fe2e7a5a6c7983cba#44c7f97a11cb8e218a21f84fe2e7a5a6c7983cba"

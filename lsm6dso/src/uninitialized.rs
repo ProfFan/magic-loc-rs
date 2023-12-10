@@ -10,7 +10,7 @@ pub struct Ready;
 
 pub struct LSM6DSO<SPI, State> {
     ll: crate::ll::LSM6DSO<SPI>,
-    state: State,
+    _state: State,
 }
 
 impl<SPI> LSM6DSO<SPI, Uninitialized>
@@ -24,7 +24,7 @@ where
     pub fn new(spi: SPI) -> Self {
         LSM6DSO {
             ll: crate::ll::LSM6DSO::new(spi),
-            state: Uninitialized,
+            _state: Uninitialized,
         }
     }
 
