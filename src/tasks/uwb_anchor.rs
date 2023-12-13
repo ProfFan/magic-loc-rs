@@ -97,6 +97,8 @@ pub async fn uwb_anchor_task(
 
     ticker = Ticker::every(Duration::from_millis(40));
 
+    let mut sequence_number = 0;
+
     loop {
         let fsm_waiting;
 
@@ -114,12 +116,21 @@ pub async fn uwb_anchor_task(
         // The deadline when we stop waiting for response packets, in system time
         let response_recv_deadline;
         if is_first_anchor {
+            sequence_number += 1;
+
             ticker.next().await;
 
             // First anchor will send the first frame
             let poll_tx_ts;
-            (dw3000, poll_tx_ts) =
-                send_poll_packet(dw3000, &config, &node_config, &mut int_gpio, 300 * 1000).await;
+            (dw3000, poll_tx_ts) = send_poll_packet(
+                dw3000,
+                &config,
+                &node_config,
+                &mut int_gpio,
+                300 * 1000,
+                sequence_number,
+            )
+            .await;
 
             defmt::info!("Poll packet sent!");
 
@@ -138,8 +149,9 @@ pub async fn uwb_anchor_task(
             defmt::debug!("Waiting for poll packet from anchor 1...");
             // First wait for the poll packet from the first anchor
             let mut poll_received = None;
+
             while poll_received.is_none() {
-                (dw3000, poll_received) =
+                (dw3000, poll_received, sequence_number) =
                     wait_for_first_poll(dw3000, config, &node_config, &mut int_gpio).await;
             }
 
@@ -161,6 +173,7 @@ pub async fn uwb_anchor_task(
                 &node_config,
                 &mut int_gpio,
                 delay_tx_time_32,
+                sequence_number,
             )
             .await;
 
@@ -243,6 +256,7 @@ pub async fn uwb_anchor_task(
             &mut int_gpio,
             &response_rx_ts,
             final_tx_slot,
+            sequence_number,
         )
         .await;
 

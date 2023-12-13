@@ -1,4 +1,4 @@
-// Serial communication module
+//! Serial communication module
 
 use core::{future::poll_fn, task::Poll};
 
@@ -9,6 +9,7 @@ use embassy_sync::waitqueue::AtomicWaker;
 use embedded_io_async::Write;
 use esp_println::Printer;
 use hal::{interrupt, peripherals::Interrupt, usb_serial_jtag::UsbSerialJtag};
+use lsm6dso::ll::all_readouts::W;
 
 static mut USB_SERIAL_READY: bool = false;
 static mut USB_SERIAL_TX_BUFFER: bbqueue::BBBuffer<512> = bbqueue::BBBuffer::new();
@@ -139,8 +140,33 @@ fn do_write(bytes: &[u8]) {
     Printer.write_bytes_assume_cs(bytes)
 }
 
-// The serial task
+/// Write to the USB serial buffer
+/// We will also need to acquire the critical section when we write to the USB serial buffer
+/// to prevent interleaving with the defmt logger
+pub fn write_to_usb_serial_buffer(bytes: &[u8]) -> Result<(), ()> {
+    let restore = unsafe { critical_section::acquire() };
 
+    let grant = unsafe { USB_SERIAL_TX_PRODUCER.as_mut() }
+        .unwrap()
+        .grant_exact(bytes.len());
+
+    if let Ok(mut grant) = grant {
+        grant.buf().copy_from_slice(bytes);
+        grant.commit(bytes.len());
+
+        unsafe { WAKER.wake() };
+
+        unsafe { critical_section::release(restore) };
+
+        Ok(())
+    } else {
+        unsafe { critical_section::release(restore) };
+
+        Err(())
+    }
+}
+
+/// The serial task
 #[task]
 pub async fn serial_comm_task(mut usb_serial: UsbSerialJtag<'static>) {
     defmt::info!("Serial Task Start!");

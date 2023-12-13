@@ -26,6 +26,7 @@ pub async fn send_poll_packet_at<SPI, CS>(
     config: &MagicLocConfig,
     mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
     at_time: u32,
+    sequence_number: u8,
 ) -> dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>
 where
     SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
@@ -49,7 +50,7 @@ where
         ack_request: true,
         pan_id_compression: true,
         frame_version: Ieee802154FrameVersion::Ieee802154,
-        sequence_number: Some(1),
+        sequence_number: Some(sequence_number),
         dst_pan_id: Some(Ieee802154Pan(config.uwb_pan_id)),
         dst_addr: Some(Ieee802154Address::BROADCAST),
         src_pan_id: None,
@@ -120,6 +121,7 @@ pub async fn send_poll_packet<SPI, CS>(
     config: &MagicLocConfig,
     mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
     delay_ns: u32,
+    sequence_number: u8,
 ) -> (dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>, Instant)
 where
     SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
@@ -143,7 +145,7 @@ where
         ack_request: true,
         pan_id_compression: true,
         frame_version: Ieee802154FrameVersion::Ieee802154,
-        sequence_number: Some(1),
+        sequence_number: Some(sequence_number),
         dst_pan_id: Some(Ieee802154Pan(config.uwb_pan_id)),
         dst_addr: Some(Ieee802154Address::BROADCAST),
         src_pan_id: None,
@@ -223,6 +225,7 @@ pub async fn wait_for_first_poll<SPI, CS>(
 ) -> (
     dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
     Option<Instant>,
+    u8,
 )
 where
     SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
@@ -232,6 +235,7 @@ where
     <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
 {
     let mut poll_received: Option<Instant> = None;
+    let mut sequence_number: u8 = 0;
     let (ready, _) = super::common::listen_for_packet(
         dw3000,
         dwm_config,
@@ -263,6 +267,7 @@ where
                         {
                             defmt::info!("Poll packet received!");
                             poll_received = Some(rx_ts);
+                            sequence_number = frame.sequence_number().unwrap();
                         }
                     }
                 }
@@ -271,7 +276,7 @@ where
     )
     .await;
 
-    return (ready, poll_received);
+    return (ready, poll_received, sequence_number);
 }
 
 /// Wait for the response packet from the tag
@@ -350,6 +355,7 @@ pub async fn send_final_packet<SPI, CS>(
     mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
     response_rx_ts: &[Option<u64>],
     final_tx_slot: u32,
+    sequence_number: u8,
 ) -> dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>
 where
     SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
@@ -374,7 +380,7 @@ where
         ack_request: false,
         pan_id_compression: true,
         frame_version: Ieee802154FrameVersion::Ieee802154,
-        sequence_number: Some(1),
+        sequence_number: Some(sequence_number),
         dst_pan_id: Some(Ieee802154Pan(config.uwb_pan_id)),
         dst_addr: Some(Ieee802154Address::BROADCAST),
         src_pan_id: None,
