@@ -168,7 +168,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
         .spawn(tasks::serial_comm_task(serial_jtag))
         .ok();
 
-    if config.mode == config::Mode::Tag && false {
+    if config.mode == config::Mode::Tag {
         defmt::info!("Mode = TAG, starting IMU");
 
         // IMU Task
@@ -186,7 +186,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
         // int_imu.listen(hal::gpio::Event::HighLevel);
 
         core0_spawner
-            .spawn(tasks::imu_task(imu_spi, dma_channel, int_imu))
+            .spawn(tasks::imu_task(imu_spi, dma_channel, int_imu, config))
             .ok();
     }
 

@@ -1,3 +1,4 @@
+use binrw::{io::Cursor, prelude::BinWrite};
 use embassy_time::{Duration, Instant, Timer};
 use embedded_hal_async::digital::Wait;
 use hal::{
@@ -12,11 +13,16 @@ use hal::{
 
 use lsm6dso::LSM6DSO;
 
+use crate::{
+    config::MagicLocConfig, operations::host::ImuReport, tasks::write_to_usb_serial_buffer,
+};
+
 #[embassy_executor::task]
 pub async fn imu_task(
     bus: Spi<'static, SPI3, FullDuplexMode>,
     dma_channel: ChannelCreator0,
     mut int1: GpioPin<Input<PullDown>, 48>,
+    config: MagicLocConfig,
 ) -> ! {
     defmt::info!("IMU Task Start!");
 
@@ -76,7 +82,7 @@ pub async fn imu_task(
     // Set the gyro to 2000dps 833Hz
     imu.ll()
         .ctrl2_g()
-        .modify(|_, w| w.fs_g(12).odr_g(7))
+        .modify(|_, w| w.fs_g(0b1100).odr_g(7))
         .unwrap();
 
     // Set the accelerometer to 8g 833Hz
@@ -109,30 +115,55 @@ pub async fn imu_task(
         // Wait for the interrupt
         int1.wait_for_high().await.unwrap();
 
-        let mut gyro_data = [0u16; 3];
-        let mut accel_data = [0u16; 3];
+        let mut imu_data = ImuReport::default();
+
+        imu_data.tag_addr = config.uwb_addr;
+        imu_data.system_ts = Instant::now().as_millis();
 
         let all_readouts = imu.ll().all_readouts().async_read().await.unwrap();
 
-        gyro_data[0] = all_readouts.outx_g();
-        gyro_data[1] = all_readouts.outy_g();
-        gyro_data[2] = all_readouts.outz_g();
+        imu_data.gyro[0] = all_readouts.outx_g() as u32;
+        imu_data.gyro[1] = all_readouts.outy_g() as u32;
+        imu_data.gyro[2] = all_readouts.outz_g() as u32;
 
-        accel_data[0] = all_readouts.outx_a();
-        accel_data[1] = all_readouts.outy_a();
-        accel_data[2] = all_readouts.outz_a();
+        imu_data.accel[0] = all_readouts.outx_a() as u32;
+        imu_data.accel[1] = all_readouts.outy_a() as u32;
+        imu_data.accel[2] = all_readouts.outz_a() as u32;
 
-        defmt::info!(
+        defmt::debug!(
             "Gyro: {} {} {}, Accel {} {} {}",
-            (gyro_data[0] as i16),
-            (gyro_data[1] as i16),
-            (gyro_data[2] as i16),
-            (accel_data[0] as i16),
-            (accel_data[1] as i16),
-            (accel_data[2] as i16)
+            (imu_data.gyro[0] as i16),
+            (imu_data.gyro[1] as i16),
+            (imu_data.gyro[2] as i16),
+            (imu_data.accel[0] as i16),
+            (imu_data.accel[1] as i16),
+            (imu_data.accel[2] as i16)
         );
 
         count += 1;
+
+        // Send the data to the host
+        let mut imu_buffer: [u8; 128] = [0; 128];
+        let mut imu_buffer_cursor = Cursor::new(&mut imu_buffer[..]);
+
+        imu_data.write(&mut imu_buffer_cursor).unwrap();
+        let imu_buffer_len = imu_buffer_cursor.position() as usize;
+
+        let mut buffer = [0u8; 128];
+        let (header, data) = buffer.split_at_mut(2);
+        header.copy_from_slice(&[0xFF, 0x01]);
+
+        let mut encoder = defmt::Encoder::new();
+        let mut cursor = 0;
+        let mut write_bytes = |bytes: &[u8]| {
+            data.as_mut()[cursor..cursor + bytes.len()].copy_from_slice(bytes);
+            cursor += bytes.len();
+        };
+        encoder.start_frame(&mut write_bytes);
+        encoder.write(&imu_buffer[..imu_buffer_len], &mut write_bytes);
+        encoder.end_frame(&mut write_bytes);
+
+        let _ = write_to_usb_serial_buffer(&buffer[..cursor + 3]);
 
         if count == 800 {
             let ts_now_new = Instant::now();

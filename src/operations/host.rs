@@ -13,3 +13,13 @@ pub struct RangeReport {
     pub trigger_txts: u64,
     pub ranges: [f64; 8],
 }
+
+#[derive(Default, Debug, Format, PartialEq, Clone, Copy)]
+#[binrw]
+#[brw(magic = b"IMU", little)]
+pub struct ImuReport {
+    pub tag_addr: u16,
+    pub system_ts: u64,
+    pub accel: [u32; 3],
+    pub gyro: [u32; 3],
+}
