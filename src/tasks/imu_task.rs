@@ -4,6 +4,7 @@ use embedded_hal_async::digital::Wait;
 use hal::{
     gdma::ChannelCreator0,
     gpio::{GpioPin, Input, PullDown},
+    macros::ram,
     peripherals::SPI3,
     spi::{
         master::{prelude::*, Spi},
@@ -18,6 +19,7 @@ use crate::{
 };
 
 #[embassy_executor::task]
+#[ram]
 pub async fn imu_task(
     bus: Spi<'static, SPI3, FullDuplexMode>,
     dma_channel: ChannelCreator0,
@@ -118,7 +120,7 @@ pub async fn imu_task(
         let mut imu_data = ImuReport::default();
 
         imu_data.tag_addr = config.uwb_addr;
-        imu_data.system_ts = Instant::now().as_millis();
+        imu_data.system_ts = Instant::now().as_micros();
 
         let all_readouts = imu.ll().all_readouts().async_read().await.unwrap();
 

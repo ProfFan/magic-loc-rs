@@ -9,7 +9,6 @@ use embassy_sync::waitqueue::AtomicWaker;
 use embedded_io_async::Write;
 use esp_println::Printer;
 use hal::{interrupt, peripherals::Interrupt, usb_serial_jtag::UsbSerialJtag};
-use lsm6dso::ll::all_readouts::W;
 
 static mut USB_SERIAL_READY: bool = false;
 static mut USB_SERIAL_TX_BUFFER: bbqueue::BBBuffer<512> = bbqueue::BBBuffer::new();

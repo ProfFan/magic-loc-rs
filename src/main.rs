@@ -168,7 +168,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
         .spawn(tasks::serial_comm_task(serial_jtag))
         .ok();
 
-    if config.mode == config::Mode::Tag {
+    if config.mode == config::Mode::Tag && false {
         defmt::info!("Mode = TAG, starting IMU");
 
         // IMU Task

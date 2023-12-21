@@ -326,8 +326,9 @@ pub async fn uwb_task(
 
         // Send the range report to the host
         let range_report = RangeReport {
-            seq_num: sequence_number,
             tag_addr: config.uwb_addr,
+            seq_num: sequence_number,
+            system_ts: Instant::now().as_micros(),
             trigger_txts: waiting_final.poll_tx_ts[0],
             ranges: twr_results,
         };
