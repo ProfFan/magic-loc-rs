@@ -26,7 +26,7 @@ use hal::{
         self,
         executor::{FromCpu1, FromCpu2, InterruptExecutor},
     },
-    gdma::{self, Gdma},
+    gdma::Gdma,
     gpio::{self, GpioPin},
     i2c::I2C,
     interrupt,
@@ -68,13 +68,11 @@ fn init_heap() {
 
 #[embassy_executor::task]
 async fn led_blinker(mut led: GpioPin<hal::gpio::Output<hal::gpio::PushPull>, 7>) -> ! {
-    loop {
-        led.set_high().unwrap();
+    led.set_high().unwrap();
 
-        loop {
-            led.toggle().unwrap();
-            Timer::after(Duration::from_millis(1_000)).await;
-        }
+    loop {
+        led.toggle().unwrap();
+        Timer::after(Duration::from_millis(1_000)).await;
     }
 }
 

@@ -170,7 +170,7 @@ where
 
     let dw3000 = txing.finish_sending().unwrap();
 
-    return (dw3000, Ok(()));
+    (dw3000, Ok(()))
 }
 
 /// Wait for the final packet from the tag to arrive
@@ -239,5 +239,5 @@ where
     )
     .await;
 
-    return (ready, final_received, recv_ok.is_ok());
+    (ready, final_received, recv_ok.is_ok())
 }

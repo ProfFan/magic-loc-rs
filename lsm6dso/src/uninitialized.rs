@@ -1,5 +1,3 @@
-use embedded_hal::spi;
-
 /// Indicates that the `LSM6DSO` instance is not initialized yet
 #[derive(Debug)]
 pub struct Uninitialized;

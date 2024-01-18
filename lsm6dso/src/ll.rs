@@ -1,7 +1,5 @@
 use core::{fmt, marker::PhantomData};
 
-// #[cfg(feature = "blocking")]
-use embedded_hal::spi;
 #[cfg(feature = "async")]
 use embedded_hal_async::spi as async_spi;
 
