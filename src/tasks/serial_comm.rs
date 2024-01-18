@@ -11,8 +11,8 @@ use esp_println::Printer;
 use hal::{interrupt, peripherals::Interrupt, usb_serial_jtag::UsbSerialJtag};
 
 static mut USB_SERIAL_READY: bool = false;
-static mut USB_SERIAL_TX_BUFFER: bbqueue::BBBuffer<512> = bbqueue::BBBuffer::new();
-static mut USB_SERIAL_TX_PRODUCER: Option<bbqueue::Producer<'static, 512>> = None;
+static mut USB_SERIAL_TX_BUFFER: bbqueue::BBBuffer<8192> = bbqueue::BBBuffer::new();
+static mut USB_SERIAL_TX_PRODUCER: Option<bbqueue::Producer<'static, 8192>> = None;
 
 static mut WAKER: AtomicWaker = AtomicWaker::new();
 
@@ -159,6 +159,8 @@ pub fn write_to_usb_serial_buffer(bytes: &[u8]) -> Result<(), ()> {
 
         Ok(())
     } else {
+        unsafe { WAKER.wake() };
+
         unsafe { critical_section::release(restore) };
 
         Err(())
@@ -179,7 +181,7 @@ pub async fn serial_comm_task(mut usb_serial: UsbSerialJtag<'static>) {
     // TX async block
     let tx = async {
         loop {
-            let tx_incoming = poll_fn(|cx| -> Poll<Result<GrantR<'_, 512>, ()>> {
+            let tx_incoming = poll_fn(|cx| -> Poll<Result<GrantR<'_, 8192>, ()>> {
                 unsafe { &WAKER }.register(cx.waker());
 
                 if let Ok(grant) = consumer.read() {

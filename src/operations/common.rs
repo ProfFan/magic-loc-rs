@@ -9,19 +9,16 @@ use crate::util::nonblocking_wait;
 
 /// Listen for a packet with a callback function
 #[ram]
-pub async fn listen_for_packet<SPI, CS, INT, CANCEL>(
-    mut dw3000: dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+pub async fn listen_for_packet<SPI, INT, CANCEL>(
+    mut dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: dw3000_ng::Config,
     mut int_gpio: &mut INT,
     cancel: CANCEL,
     callback: impl FnOnce(&[u8], Instant),
-) -> (dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>, Result<(), ()>)
+) -> (dw3000_ng::DW3000<SPI, dw3000_ng::Ready>, Result<(), ()>)
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    CS: embedded_hal::digital::v2::OutputPin,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
+    SPI: embedded_hal::spi::SpiDevice<u8>,
+    SPI::Error: core::fmt::Debug + defmt::Format,
     INT: embedded_hal_async::digital::Wait,
     CANCEL: Future,
 {

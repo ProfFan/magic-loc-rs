@@ -18,22 +18,19 @@ use smoltcp::wire::{
 
 /// Wait for the poll packet from the anchor to arrive
 #[ram]
-pub async fn wait_for_poll<SPI, CS, INT, CANCEL>(
-    dw3000: dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+pub async fn wait_for_poll<SPI, INT, CANCEL>(
+    dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: dw3000_ng::Config,
     node_config: &MagicLocConfig,
     mut int_gpio: &mut INT,
     cancel: CANCEL,
 ) -> (
-    dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+    dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     Option<(u16, u40, Instant, u8)>,
 )
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    CS: embedded_hal::digital::v2::OutputPin,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
+    SPI: embedded_hal::spi::SpiDevice<u8>,
+    SPI::Error: core::fmt::Debug + defmt::Format,
     INT: embedded_hal_async::digital::Wait,
     CANCEL: Future,
 {
@@ -91,20 +88,17 @@ where
 }
 
 #[ram]
-pub async fn send_response_packet_at<SPI, CS, INT>(
-    dw3000: dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+pub async fn send_response_packet_at<SPI, INT>(
+    dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: dw3000_ng::Config,
     config: &MagicLocConfig,
     mut int_gpio: &mut INT,
     delay_tx_time: u32,
     sequence_number: u8,
-) -> (dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>, Result<(), ()>)
+) -> (dw3000_ng::DW3000<SPI, dw3000_ng::Ready>, Result<(), ()>)
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    CS: embedded_hal::digital::v2::OutputPin,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
+    SPI: embedded_hal::spi::SpiDevice<u8>,
+    SPI::Error: core::fmt::Debug + defmt::Format,
     INT: embedded_hal_async::digital::Wait,
 {
     let response_packet = ResponsePacket::new(PacketType::Response, u4::new(0));
@@ -183,23 +177,20 @@ where
 ///
 /// Returns the rx time of the final packet
 #[ram]
-pub async fn wait_for_final<SPI, CS, INT, CANCEL>(
-    dw3000: dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+pub async fn wait_for_final<SPI, INT, CANCEL>(
+    dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: dw3000_ng::Config,
     node_config: &MagicLocConfig,
     mut int_gpio: &mut INT,
     cancel: CANCEL,
 ) -> (
-    dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+    dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     Option<(u16, FinalPacket, Instant)>,
     bool,
 )
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    CS: embedded_hal::digital::v2::OutputPin,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
+    SPI: embedded_hal::spi::SpiDevice<u8>,
+    SPI::Error: core::fmt::Debug + defmt::Format,
     INT: embedded_hal_async::digital::Wait,
     CANCEL: Future,
 {

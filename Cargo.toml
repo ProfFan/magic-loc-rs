@@ -14,13 +14,11 @@ members = ["lsm6dso"]
 #     "esp-now",
 #     "phy-enable-usb",
 # ] }
-dw3000-ng = { package = "dw3000-ng", git = "https://github.com/ProfFan/dw3000", rev = "102938ff4ec42aa95335517d126119f8448f3488", features = [
-    "defmt",
-] }
+dw3000-ng = { package = "dw3000-ng", version = "0.5", features = ["defmt"] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
-magic-loc-protocol = { package = "magic-loc-protocol", git = "ssh://git@github.com/ProfFan/magic-loc-protocol.git", rev = "3fb1f311063ecaf0b535cda94359ef76834a6f8e" }
+magic-loc-protocol = { package = "magic-loc-protocol", git = "ssh://git@github.com/ProfFan/magic-loc-protocol.git", rev = "1367864cc576948c33c983ca63ac97c24ad4e679" }
 
-hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal", rev = "67afd5e102be98a8ef50200fe8ef7a5b29147adc", features = [
+hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal.git", rev = "02a599ac1ee555fa38d32557e02159acd6c6ab77", features = [
     "embassy",
     "embassy-executor-interrupt",
     "embassy-executor-thread",
@@ -28,20 +26,25 @@ hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal", rev
     "async",
     "defmt",
 ] }
+
 static_cell = { version = "*", features = ["nightly"] }
-embedded-hal = "*"
-embedded-hal-async = "=1.0.0-rc.2"
-esp-backtrace = { version = "0.9.0", default-features = false, features = [
+embedded-hal = "1.0.0"
+embedded-hal-async = "1.0.0"
+embedded-hal-bus = "0.1.0"
+
+esp-backtrace = { git = "https://github.com/ProfFan/esp-backtrace", rev = "1206aa40e16606045dacb38134cc9df4e39f2f62", default-features = false, features = [
     "esp32s3",
     "panic-handler",
     "exception-handler",
     "print-jtag-serial",
+    "defmt-espflash",
+    "colors"
 ] }
 esp-println = { git = "https://github.com/esp-rs/esp-println", branch = "main", default-features = false, features = [
     "esp32s3",
     "log",
     # "defmt-espflash",
-    "jtag_serial",
+    "jtag-serial",
     "critical-section",
 ] }
 
@@ -67,7 +70,7 @@ critical-section = { version = "1.1.2", default-features = false }
 defmt = { package = "defmt", version = "*", features = ["encoding-rzcobs"] }
 
 esp-alloc = { version = "0.3.0" }
-smoltcp = { version = "0.10.0", default-features = false, features = [
+smoltcp = { version = "0.11.0", default-features = false, features = [
     "proto-igmp",
     "proto-ipv4",
     "socket-tcp",
@@ -79,14 +82,17 @@ smoltcp = { version = "0.10.0", default-features = false, features = [
     "socket-raw",
     "socket-dhcpv4",
 ] }
-embedded-svc = { version = "0.25.0", default-features = false, features = [] }
+embedded-svc = { version = "0.26.4", default-features = false, features = [] }
 embedded-io = "0.6.1"
 embedded-io-async = "0.6.1"
-heapless = { version = "0.7.16", default-features = false }
-embassy-executor = { version = "0.4.0", features = ["nightly"] }
-embassy-time = { version = "0.2.0", features = ["defmt"] }
+heapless = { version = "0.8", default-features = false, features = [
+    "defmt-03",
+] }
+embassy-executor = { version = "0.5.0", features = ["nightly"] }
+embassy-time = { version = "0.3.0", features = ["defmt"] }
 embassy-futures = "*"
 embassy-sync = "*"
+embassy-embedded-hal = { version = "0.1", features = ["defmt"] }
 
 scopeguard = { version = "^1.2.0", default-features = false }
 
@@ -97,7 +103,7 @@ arbitrary-int = "^1.2"
 opt-level = 3
 
 [profile.dev]
-lto = "off"
+lto = "thin"
 [profile.release]
 lto = "fat"
 opt-level = 3

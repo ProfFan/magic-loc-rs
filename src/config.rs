@@ -46,6 +46,14 @@ impl Format for NetworkTopology {
     }
 }
 
+/// CIR acquisition options
+#[derive(Default, Debug, Clone, Copy, Format)]
+#[binrw]
+pub struct CirAcquisitionOptions {
+    pub start_tap: u8,
+    pub num_samples: u8,
+}
+
 /// Config struct saved to flash
 #[binrw]
 #[brw(magic = b"MAGL", little)]
@@ -55,6 +63,7 @@ pub struct MagicLocConfig {
     pub uwb_pan_id: u16,
     pub mode: Mode,
     pub network_topology: NetworkTopology,
+    pub cir_acq_options: Option<CirAcquisitionOptions>,
 }
 
 impl MagicLocConfig {

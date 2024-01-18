@@ -26,8 +26,8 @@ use hal::{
         self,
         executor::{FromCpu1, FromCpu2, InterruptExecutor},
     },
-    gdma::Gdma,
-    gpio::GpioPin,
+    gdma::{self, Gdma},
+    gpio::{self, GpioPin},
     i2c::I2C,
     interrupt,
     peripherals::{Interrupt, Peripherals, I2C0, SPI2},
@@ -110,13 +110,17 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     drop(storage);
 
     // let config = config::MagicLocConfig {
-    //     mode: config::Mode::Tag,
-    //     uwb_addr: 0x0003,
+    //     mode: config::Mode::Sniffer,
+    //     uwb_addr: 0x2001,
     //     uwb_pan_id: 0xBEEF,
     //     network_topology: config::NetworkTopology {
     //         anchor_addrs: [0x1001, 0x1002, 0x1003, 0x1004, 0x1005, 0x1006, 0x1007, 0x1008],
     //         tag_addrs: [0x0001, 0x0002, 0x0003],
     //     },
+    //     cir_acq_options: Some(config::CirAcquisitionOptions {
+    //         start_tap: 0,
+    //         num_samples: 128,
+    //     }),
     // };
 
     // config::write_config(&config).await.unwrap();
@@ -178,7 +182,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
                     Some(io.pins.gpio33),
                     Some(io.pins.gpio47),
                     Some(io.pins.gpio17),
-                    Some(io.pins.gpio34),
+                    gpio::NO_PIN,
                 );
 
         // IMU INT
@@ -186,7 +190,13 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
         // int_imu.listen(hal::gpio::Event::HighLevel);
 
         core0_spawner
-            .spawn(tasks::imu_task(imu_spi, dma_channel, int_imu, config))
+            .spawn(tasks::imu_task(
+                imu_spi,
+                io.pins.gpio34.into_push_pull_output(),
+                dma_channel,
+                int_imu,
+                config,
+            ))
             .ok();
     }
 
@@ -218,7 +228,12 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
 
                 spawner
                     .spawn(tasks::uwb_anchor_task(
-                        dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000, config,
+                        dw3000_spi,
+                        cs_dw3000,
+                        rst_dw3000,
+                        int_dw3000,
+                        config,
+                        dma.channel1,
                     ))
                     .ok();
             }
@@ -227,7 +242,12 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
 
                 spawner
                     .spawn(tasks::uwb_task(
-                        dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000, config,
+                        dw3000_spi,
+                        cs_dw3000,
+                        rst_dw3000,
+                        int_dw3000,
+                        config,
+                        dma.channel1,
                     ))
                     .ok();
             }
@@ -236,7 +256,11 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
 
                 spawner
                     .spawn(tasks::uwb_sniffer(
-                        dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000,
+                        dw3000_spi,
+                        cs_dw3000,
+                        rst_dw3000,
+                        int_dw3000,
+                        dma.channel1,
                     ))
                     .ok();
             }

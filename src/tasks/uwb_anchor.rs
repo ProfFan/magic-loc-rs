@@ -1,10 +1,20 @@
+use core::cell::RefCell;
+
 use dw3000_ng::{self, hl::ConfigGPIOs};
+use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
+use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Duration, Instant, Ticker, Timer};
 use hal::{
+    dma_descriptors,
+    gdma::ChannelCreator1,
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
     prelude::*,
-    spi::{master::Spi, FullDuplexMode},
+    spi::{
+        master::{dma::WithDmaSpi2, Spi},
+        FullDuplexMode,
+    },
+    FlashSafeDma,
 };
 
 use heapless::Vec;
@@ -28,8 +38,36 @@ pub async fn uwb_anchor_task(
     mut rst_gpio: GpioPin<Output<PushPull>, 9>,
     mut int_gpio: GpioPin<Input<PullDown>, 15>,
     node_config: MagicLocConfig,
+    dma_channel: ChannelCreator1,
 ) -> ! {
     defmt::info!("UWB Anchor Task Start!");
+
+    let (mut dma_tx, mut dma_rx) = dma_descriptors!(32000);
+
+    let bus = bus.with_dma(dma_channel.configure(
+        false,
+        &mut dma_tx,
+        &mut dma_rx,
+        hal::dma::DmaPriority::Priority0,
+    ));
+
+    // Enable DMA interrupts
+    hal::interrupt::enable(
+        hal::peripherals::Interrupt::DMA_IN_CH1,
+        hal::interrupt::Priority::Priority2,
+    )
+    .unwrap();
+    hal::interrupt::enable(
+        hal::peripherals::Interrupt::DMA_OUT_CH1,
+        hal::interrupt::Priority::Priority2,
+    )
+    .unwrap();
+
+    let bus = FlashSafeDma::<_, 32000>::new(bus);
+
+    let bus = NoopMutex::new(RefCell::new(bus));
+
+    let device = SpiDevice::new(&bus, cs_gpio);
 
     let mut config = dw3000_ng::Config::default();
     config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
@@ -45,7 +83,7 @@ pub async fn uwb_anchor_task(
 
     Timer::after(Duration::from_millis(200)).await;
 
-    let mut dw3000 = dw3000_ng::DW3000::new(bus, cs_gpio)
+    let mut dw3000 = dw3000_ng::DW3000::new(device)
         .init()
         .expect("Failed init.")
         .config(config)

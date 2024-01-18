@@ -20,20 +20,17 @@ use smoltcp::wire::{
 ///
 /// NOTE: The 32-bit ticks are the first 32-bits of the 40-bit device time
 
-pub async fn send_poll_packet_at<SPI, CS>(
-    mut dw3000: dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+pub async fn send_poll_packet_at<SPI>(
+    mut dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: &dw3000_ng::Config,
     config: &MagicLocConfig,
     mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
     at_time: u32,
     sequence_number: u8,
-) -> dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>
+) -> dw3000_ng::DW3000<SPI, dw3000_ng::Ready>
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    CS: embedded_hal::digital::v2::OutputPin,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
+    SPI: embedded_hal::spi::SpiDevice<u8>,
+    SPI::Error: core::fmt::Debug + defmt::Format,
 {
     let mut poll_packet = PollPacket::new(
         magic_loc_protocol::packet::PacketType::Poll,
@@ -115,20 +112,17 @@ where
     dw3000
 }
 
-pub async fn send_poll_packet<SPI, CS>(
-    mut dw3000: dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+pub async fn send_poll_packet<SPI>(
+    mut dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: &dw3000_ng::Config,
     config: &MagicLocConfig,
     mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
     delay_ns: u32,
     sequence_number: u8,
-) -> (dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>, Instant)
+) -> (dw3000_ng::DW3000<SPI, dw3000_ng::Ready>, Instant)
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    CS: embedded_hal::digital::v2::OutputPin,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
+    SPI: embedded_hal::spi::SpiDevice<u8>,
+    SPI::Error: core::fmt::Debug + defmt::Format,
 {
     let mut poll_packet = PollPacket::new(
         magic_loc_protocol::packet::PacketType::Poll,
@@ -217,22 +211,19 @@ where
 }
 
 /// Wait for the first poll packet from the first anchor to arrive
-pub async fn wait_for_first_poll<SPI, CS>(
-    dw3000: dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+pub async fn wait_for_first_poll<SPI>(
+    dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: dw3000_ng::Config,
     node_config: &MagicLocConfig,
     mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
 ) -> (
-    dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+    dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     Option<Instant>,
     u8,
 )
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    CS: embedded_hal::digital::v2::OutputPin,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
+    SPI: embedded_hal::spi::SpiDevice<u8>,
+    SPI::Error: core::fmt::Debug + defmt::Format,
 {
     let mut poll_received: Option<Instant> = None;
     let mut sequence_number: u8 = 0;
@@ -280,23 +271,20 @@ where
 }
 
 /// Wait for the response packet from the tag
-pub async fn wait_for_response<SPI, CS>(
-    dw3000: dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+pub async fn wait_for_response<SPI>(
+    dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: dw3000_ng::Config,
     node_config: &MagicLocConfig,
     mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
     cancel: impl core::future::Future,
 ) -> (
-    dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+    dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     Option<(u16, Instant)>,
     bool,
 )
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    CS: embedded_hal::digital::v2::OutputPin,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
+    SPI: embedded_hal::spi::SpiDevice<u8>,
+    SPI::Error: core::fmt::Debug + defmt::Format,
 {
     let mut response_received: Option<(u16, Instant)> = None;
     let (ready, result) = super::common::listen_for_packet(
@@ -348,21 +336,18 @@ where
 /// Send the FINAL packet
 ///
 /// NOTE: This is the packet that contains the RX timestamp of the response packet
-pub async fn send_final_packet<SPI, CS>(
-    mut dw3000: dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>,
+pub async fn send_final_packet<SPI>(
+    mut dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: &dw3000_ng::Config,
     config: &MagicLocConfig,
     mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
     response_rx_ts: &[Option<u64>],
     final_tx_slot: u32,
     sequence_number: u8,
-) -> dw3000_ng::DW3000<SPI, CS, dw3000_ng::Ready>
+) -> dw3000_ng::DW3000<SPI, dw3000_ng::Ready>
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    CS: embedded_hal::digital::v2::OutputPin,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug + defmt::Format,
-    <CS as embedded_hal::digital::v2::OutputPin>::Error: core::fmt::Debug + defmt::Format,
+    SPI: embedded_hal::spi::SpiDevice<u8>,
+    SPI::Error: core::fmt::Debug + defmt::Format,
 {
     let final_packet = magic_loc_protocol::packet::FinalPacket::new(
         magic_loc_protocol::packet::PacketType::Final,

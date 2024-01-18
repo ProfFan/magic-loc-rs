@@ -1,4 +1,4 @@
-use embedded_hal::blocking::spi;
+use embedded_hal::spi;
 
 /// Indicates that the `LSM6DSO` instance is not initialized yet
 #[derive(Debug)]
@@ -13,10 +13,7 @@ pub struct LSM6DSO<SPI, State> {
     _state: State,
 }
 
-impl<SPI> LSM6DSO<SPI, Uninitialized>
-where
-    SPI: spi::Transfer<u8> + spi::Write<u8>,
-{
+impl<SPI> LSM6DSO<SPI, Uninitialized> {
     /// Create a new instance of `DW3000`
     ///
     /// Requires the SPI peripheral and the chip select pin that are connected

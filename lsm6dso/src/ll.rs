@@ -1,7 +1,7 @@
 use core::{fmt, marker::PhantomData};
 
 // #[cfg(feature = "blocking")]
-use embedded_hal::blocking::spi;
+use embedded_hal::spi;
 #[cfg(feature = "async")]
 use embedded_hal_async::spi as async_spi;
 
@@ -30,9 +30,10 @@ impl<SPI> LSM6DSO<SPI> {
 /// [`LSM6DSO`].
 pub struct RegAccessor<'s, R, SPI>(&'s mut LSM6DSO<SPI>, PhantomData<R>);
 
+#[cfg(not(feature = "async"))]
 impl<'s, R, SPI> RegAccessor<'s, R, SPI>
 where
-    SPI: spi::Transfer<u8> + spi::Write<u8>,
+    SPI: spi::SpiDevice<u8>,
 {
     /// Read from the register
     pub fn read(&mut self) -> Result<R::Read, Error<SPI>>
@@ -43,7 +44,10 @@ where
         let buffer = R::buffer(&mut r);
 
         init_header::<R>(false, buffer);
-        self.0.bus.transfer(buffer).map_err(Error::Transfer)?;
+        self.0
+            .bus
+            .transfer_in_place(buffer)
+            .map_err(Error::Transfer)?;
 
         Ok(r)
     }
@@ -60,7 +64,7 @@ where
         let buffer = R::buffer(&mut w);
         init_header::<R>(true, buffer);
 
-        <SPI as spi::Write<u8>>::write(&mut self.0.bus, buffer).map_err(Error::Write)?;
+        SPI::write(&mut self.0.bus, buffer).map_err(Error::Transfer)?;
 
         Ok(())
     }
@@ -81,7 +85,7 @@ where
         let buffer = <R as Writable>::buffer(&mut w);
         init_header::<R>(true, buffer);
 
-        <SPI as spi::Write<u8>>::write(&mut self.0.bus, buffer).map_err(Error::Write)?;
+        SPI::write(&mut self.0.bus, buffer).map_err(Error::Transfer)?;
 
         Ok(())
     }
@@ -91,9 +95,7 @@ where
 #[cfg(feature = "async")]
 impl<'s, R, SPI> RegAccessor<'s, R, SPI>
 where
-    SPI: spi::Transfer<u8>,
-    SPI: spi::Write<u8, Error = <SPI as spi::Transfer<u8>>::Error>,
-    SPI: async_spi::SpiBus<Error = <SPI as spi::Transfer<u8>>::Error>,
+    SPI: async_spi::SpiDevice<u8>,
 {
     /// Read from the register
     pub async fn async_read(&mut self) -> Result<R::Read, Error<SPI>>
@@ -106,7 +108,7 @@ where
         let mut write_buffer: [u8; R::LEN] = [0u8; R::LEN];
 
         init_header::<R>(false, &mut write_buffer);
-        async_spi::SpiBus::transfer(&mut self.0.bus, buffer, &write_buffer)
+        async_spi::SpiDevice::transfer(&mut self.0.bus, buffer, &write_buffer)
             .await
             .map_err(|e| Error::Transfer(e))?;
 
@@ -128,9 +130,9 @@ where
 
         let header_size = init_header::<R>(true, buffer);
 
-        async_spi::SpiBus::write(&mut self.0.bus, &buffer[header_size..])
+        async_spi::SpiDevice::write(&mut self.0.bus, &buffer[header_size..])
             .await
-            .map_err(|e| Error::Write(e))?;
+            .map_err(|e| Error::Transfer(e))?;
 
         Ok(())
     }
@@ -152,38 +154,58 @@ where
         let buffer = <R as Writable>::buffer(&mut w);
         let header_size = init_header::<R>(true, buffer);
 
-        async_spi::SpiBus::write(&mut self.0.bus, &buffer[header_size..])
+        async_spi::SpiDevice::write(&mut self.0.bus, &buffer[header_size..])
             .await
-            .map_err(Error::Write)?;
+            .map_err(Error::Transfer)?;
 
         Ok(())
     }
 }
 
 /// An SPI error that can occur when communicating with the LSM6DSO
+#[cfg(not(feature = "async"))]
 pub enum Error<SPI>
 where
-    SPI: spi::Transfer<u8> + spi::Write<u8>,
+    SPI: spi::SpiDevice<u8>,
 {
     /// SPI error occured during a transfer transaction
-    Transfer(<SPI as spi::Transfer<u8>>::Error),
-
-    /// SPI error occured during a write transaction
-    Write(<SPI as spi::Write<u8>>::Error),
+    Transfer(SPI::Error),
 }
 
 // We can't derive this implementation, as the compiler will complain that the
 // associated error type doesn't implement `Debug`.
+#[cfg(not(feature = "async"))]
 impl<SPI> fmt::Debug for Error<SPI>
 where
-    SPI: spi::Transfer<u8> + spi::Write<u8>,
-    <SPI as spi::Transfer<u8>>::Error: fmt::Debug,
-    <SPI as spi::Write<u8>>::Error: fmt::Debug,
+    SPI: spi::SpiDevice<u8>,
+    SPI::Error: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Transfer(error) => write!(f, "Transfer({:?})", error),
-            Error::Write(error) => write!(f, "Write({:?})", error),
+        }
+    }
+}
+
+/// An SPI error that can occur when communicating with the LSM6DSO
+#[cfg(feature = "async")]
+pub enum Error<SPI>
+where
+    SPI: async_spi::SpiDevice<u8>,
+{
+    /// SPI error occured during a transfer transaction
+    Transfer(SPI::Error),
+}
+
+#[cfg(feature = "async")]
+impl<SPI> fmt::Debug for Error<SPI>
+where
+    SPI: async_spi::SpiDevice<u8>,
+    SPI::Error: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::Transfer(error) => write!(f, "Transfer({:?})", error),
         }
     }
 }
