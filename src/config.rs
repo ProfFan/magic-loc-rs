@@ -46,6 +46,30 @@ impl Format for NetworkTopology {
     }
 }
 
+/// CIR acquisition options
+#[derive(Default, Debug, Clone, Copy, Format)]
+#[binrw]
+pub struct CirAcquisitionOptions {
+    pub start_tap: u8,
+    pub num_samples: u8,
+}
+
+#[derive(Default, Debug, Clone, Copy, Format)]
+#[binrw]
+pub struct LSM6DSOConfig {
+    pub odr: u8,
+    pub fs: u8,
+}
+
+/// IMU configuration options
+#[derive(Default, Debug, Clone, Copy, Format)]
+#[binrw]
+pub enum ImuConfig {
+    #[default]
+    None,
+    LSM6DSO(LSM6DSOConfig),
+}
+
 /// Config struct saved to flash
 #[binrw]
 #[brw(magic = b"MAGL", little)]
@@ -55,6 +79,8 @@ pub struct MagicLocConfig {
     pub uwb_pan_id: u16,
     pub mode: Mode,
     pub network_topology: NetworkTopology,
+    pub cir_acq_options: Option<CirAcquisitionOptions>,
+    pub enable_imu: ImuConfig,
 }
 
 impl MagicLocConfig {

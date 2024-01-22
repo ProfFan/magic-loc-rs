@@ -1,12 +1,21 @@
-use core::future::pending;
+use core::{cell::RefCell, future::pending};
 
+use binrw::io::Cursor;
 use dw3000_ng::{self, hl::ConfigGPIOs};
+use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
+use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Duration, Instant, Timer};
 use hal::{
+    dma_descriptors,
+    gdma::ChannelCreator1,
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
     prelude::*,
-    spi::{master::Spi, FullDuplexMode},
+    spi::{
+        master::{dma::WithDmaSpi2, Spi},
+        FullDuplexMode,
+    },
+    FlashSafeDma,
 };
 
 use heapless::Vec;
@@ -14,7 +23,11 @@ use magic_loc_protocol::tag_state_machine::TagSideStateMachine;
 
 use crate::{
     config::MagicLocConfig,
-    operations::tag::{send_response_packet_at, wait_for_final, wait_for_poll},
+    operations::{
+        host::RangeReport,
+        tag::{send_response_packet_at, wait_for_final, wait_for_poll},
+    },
+    tasks::write_to_usb_serial_buffer,
 };
 
 /// Task for the UWB Tag
@@ -35,8 +48,36 @@ pub async fn uwb_task(
     mut rst_gpio: GpioPin<Output<PushPull>, 9>,
     mut int_gpio: GpioPin<Input<PullDown>, 15>,
     config: MagicLocConfig,
+    dma_channel: ChannelCreator1,
 ) -> ! {
     defmt::info!("UWB Task Start!");
+
+    let (mut dma_tx, mut dma_rx) = dma_descriptors!(32000);
+
+    let bus = bus.with_dma(dma_channel.configure(
+        false,
+        &mut dma_tx,
+        &mut dma_rx,
+        hal::dma::DmaPriority::Priority0,
+    ));
+
+    // Enable DMA interrupts
+    hal::interrupt::enable(
+        hal::peripherals::Interrupt::DMA_IN_CH1,
+        hal::interrupt::Priority::Priority2,
+    )
+    .unwrap();
+    hal::interrupt::enable(
+        hal::peripherals::Interrupt::DMA_OUT_CH1,
+        hal::interrupt::Priority::Priority2,
+    )
+    .unwrap();
+
+    let bus = FlashSafeDma::<_, 32000>::new(bus);
+
+    let bus = NoopMutex::new(RefCell::new(bus));
+
+    let device = SpiDevice::new(&bus, cs_gpio);
 
     let mut uwb_config = dw3000_ng::Config::default();
     uwb_config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
@@ -52,7 +93,7 @@ pub async fn uwb_task(
 
     Timer::after(Duration::from_millis(200)).await;
 
-    let mut dw3000 = dw3000_ng::DW3000::new(bus, cs_gpio)
+    let mut dw3000 = dw3000_ng::DW3000::new(device)
         .init()
         .expect("Failed init.")
         .config(uwb_config)
@@ -97,6 +138,7 @@ pub async fn uwb_task(
         let mut delay_ns = None;
         let mut poll_rx_timeout = None;
         let mut response_tx_slot: Option<u32> = None;
+        let mut sequence_number = 0;
 
         while response_tx_slot.is_none() {
             // As a tag, we wait for the POLL frame from an anchor
@@ -107,7 +149,7 @@ pub async fn uwb_task(
             (dw3000, rx_addr_time) =
                 wait_for_poll(dw3000, uwb_config, &config, &mut int_gpio, pending::<()>()).await;
 
-            if let Some((rx_addr, tx_time, rx_time)) = rx_addr_time {
+            if let Some((rx_addr, tx_time, rx_time, sequence_number_)) = rx_addr_time {
                 // Get the index of the anchor
                 let anchor_index = config
                     .network_topology
@@ -128,14 +170,20 @@ pub async fn uwb_task(
                         .position(|&x| x == config.uwb_addr)
                         .unwrap();
                     poll_rx_timeout = Some(
-                        Instant::now() + Duration::from_micros(1000 * (8 - anchor_index) as u64),
+                        Instant::now()
+                            + Duration::from_micros(1000 * (8 - anchor_index) as u64 - 800),
                     );
                     delay_ns = Some(1000 * 1000 * (8 + tag_index - anchor_index) as u64);
                     let delay_device = delay_ns.unwrap() * 64; // 64 ticks per ns
+
+                    // NOTE: the last bit of the tx time is always 0 as it is ignored by the DW3000
                     response_tx_slot = Some(
-                        ((rx_time.value().div_ceil(1 << 8) + delay_device.div_ceil(1 << 8))
-                            % (1 << 32)) as u32,
-                    )
+                        (((rx_time.value() + delay_device).div_ceil(1 << 9) << 1) % (1 << 32))
+                            as u32,
+                    );
+
+                    // Set the sequence number
+                    sequence_number = sequence_number_;
                 }
             }
         }
@@ -144,7 +192,7 @@ pub async fn uwb_task(
         let poll_rx_timeout = poll_rx_timeout.unwrap();
         let response_tx_slot = response_tx_slot.unwrap();
 
-        defmt::info!(
+        defmt::debug!(
             "Response delay = {}ns, tx slot = {}",
             delay_ns,
             response_tx_slot
@@ -161,7 +209,12 @@ pub async fn uwb_task(
             (dw3000, rx_addr_time) =
                 wait_for_poll(dw3000, uwb_config, &config, &mut int_gpio, timeout_future).await;
 
-            if let Some((rx_addr, tx_time, rx_time)) = rx_addr_time {
+            if let Some((rx_addr, tx_time, rx_time, sequence_number_)) = rx_addr_time {
+                if sequence_number_ != sequence_number {
+                    // Not my frame
+                    defmt::error!("Not my frame!");
+                    continue;
+                }
                 // Get the index of the anchor
                 let anchor_index = config
                     .network_topology
@@ -186,9 +239,15 @@ pub async fn uwb_task(
         dw3000.force_idle().unwrap();
 
         let result;
-        (dw3000, result) =
-            send_response_packet_at(dw3000, uwb_config, &config, &mut int_gpio, response_tx_slot)
-                .await;
+        (dw3000, result) = send_response_packet_at(
+            dw3000,
+            uwb_config,
+            &config,
+            &mut int_gpio,
+            response_tx_slot,
+            sequence_number,
+        )
+        .await;
 
         if result.is_err() {
             defmt::error!("Response send fail!");
@@ -244,7 +303,7 @@ pub async fn uwb_task(
             }
         }
 
-        defmt::info!(
+        defmt::debug!(
             "All done, response_rx_ts = {:?}",
             waiting_final.response_rx_ts
         );
@@ -282,6 +341,14 @@ pub async fn uwb_task(
                 let R_b_hat = (t6 - t3).rem_euclid(1 << 40) as i128;
                 let D_b_hat = (t5 - t4).rem_euclid(1 << 40) as i128;
 
+                defmt::debug!(
+                    "R_a_hat = {}, D_a_hat = {}, R_b_hat = {}, D_b_hat = {}",
+                    R_a_hat,
+                    D_a_hat,
+                    R_b_hat,
+                    D_b_hat
+                );
+
                 let tof_ticks = (R_a_hat * R_b_hat - D_a_hat * D_b_hat)
                     / (R_a_hat + R_b_hat + D_a_hat + D_b_hat);
                 let tof = tof_ticks as f64 * SEC_PER_TICK;
@@ -291,7 +358,40 @@ pub async fn uwb_task(
             }
         }
 
-        defmt::info!("TWR Results = {:?}", twr_results);
+        defmt::debug!("SEQ = {}, TWR Results = {:?}", sequence_number, twr_results);
+
+        // Send the range report to the host
+        let range_report = RangeReport {
+            tag_addr: config.uwb_addr,
+            seq_num: sequence_number,
+            system_ts: Instant::now().as_micros(),
+            trigger_txts: waiting_final.poll_tx_ts[0],
+            ranges: twr_results,
+        };
+
+        let mut range_buffer: [u8; 128] = [0; 128];
+        let mut cursor = Cursor::new(&mut range_buffer[..]);
+        binrw::BinWrite::write(&range_report, &mut cursor).unwrap();
+        let report_len = cursor.position() as usize;
+
+        let mut buffer: [u8; 128] = [0; 128];
+        let (header, data) = buffer.split_at_mut(2);
+        header.copy_from_slice(&[0xFF, 0x01]);
+
+        let mut encoder = defmt::Encoder::new();
+        let mut cursor = 0;
+        let mut write_bytes = |bytes: &[u8]| {
+            data.as_mut()[cursor..cursor + bytes.len()].copy_from_slice(bytes);
+            cursor += bytes.len();
+        };
+        encoder.start_frame(&mut write_bytes);
+        encoder.write(&range_buffer[..report_len], &mut write_bytes);
+        encoder.end_frame(&mut write_bytes);
+
+        let _ = write_to_usb_serial_buffer(&buffer[..cursor + 3]);
+
+        // clear waiting_final.response_rx_ts
+        waiting_final.response_rx_ts.fill(0);
 
         tag_sm = waiting_final.idle();
     }

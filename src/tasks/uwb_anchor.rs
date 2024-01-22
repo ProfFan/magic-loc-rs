@@ -1,10 +1,20 @@
+use core::cell::RefCell;
+
 use dw3000_ng::{self, hl::ConfigGPIOs};
+use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
+use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Duration, Instant, Ticker, Timer};
 use hal::{
+    dma_descriptors,
+    gdma::ChannelCreator1,
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
     prelude::*,
-    spi::{master::Spi, FullDuplexMode},
+    spi::{
+        master::{dma::WithDmaSpi2, Spi},
+        FullDuplexMode,
+    },
+    FlashSafeDma,
 };
 
 use heapless::Vec;
@@ -28,8 +38,36 @@ pub async fn uwb_anchor_task(
     mut rst_gpio: GpioPin<Output<PushPull>, 9>,
     mut int_gpio: GpioPin<Input<PullDown>, 15>,
     node_config: MagicLocConfig,
+    dma_channel: ChannelCreator1,
 ) -> ! {
     defmt::info!("UWB Anchor Task Start!");
+
+    let (mut dma_tx, mut dma_rx) = dma_descriptors!(32000);
+
+    let bus = bus.with_dma(dma_channel.configure(
+        false,
+        &mut dma_tx,
+        &mut dma_rx,
+        hal::dma::DmaPriority::Priority0,
+    ));
+
+    // Enable DMA interrupts
+    hal::interrupt::enable(
+        hal::peripherals::Interrupt::DMA_IN_CH1,
+        hal::interrupt::Priority::Priority2,
+    )
+    .unwrap();
+    hal::interrupt::enable(
+        hal::peripherals::Interrupt::DMA_OUT_CH1,
+        hal::interrupt::Priority::Priority2,
+    )
+    .unwrap();
+
+    let bus = FlashSafeDma::<_, 32000>::new(bus);
+
+    let bus = NoopMutex::new(RefCell::new(bus));
+
+    let device = SpiDevice::new(&bus, cs_gpio);
 
     let mut config = dw3000_ng::Config::default();
     config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
@@ -45,7 +83,7 @@ pub async fn uwb_anchor_task(
 
     Timer::after(Duration::from_millis(200)).await;
 
-    let mut dw3000 = dw3000_ng::DW3000::new(bus, cs_gpio)
+    let mut dw3000 = dw3000_ng::DW3000::new(device)
         .init()
         .expect("Failed init.")
         .config(config)
@@ -93,11 +131,13 @@ pub async fn uwb_anchor_task(
         .position(|&x| x == node_config.uwb_addr)
         .unwrap();
 
-    let mut ticker = Ticker::every(Duration::from_millis(500));
+    let mut ticker;
+
+    ticker = Ticker::every(Duration::from_millis(40));
+
+    let mut sequence_number = 0;
 
     loop {
-        ticker.next().await;
-
         let fsm_waiting;
 
         // If we are the first anchor, we will send the first frame
@@ -114,10 +154,21 @@ pub async fn uwb_anchor_task(
         // The deadline when we stop waiting for response packets, in system time
         let response_recv_deadline;
         if is_first_anchor {
+            sequence_number += 1;
+
+            ticker.next().await;
+
             // First anchor will send the first frame
             let poll_tx_ts;
-            (dw3000, poll_tx_ts) =
-                send_poll_packet(dw3000, &config, &node_config, &mut int_gpio, 300 * 1000).await;
+            (dw3000, poll_tx_ts) = send_poll_packet(
+                dw3000,
+                &config,
+                &node_config,
+                &mut int_gpio,
+                300 * 1000,
+                sequence_number,
+            )
+            .await;
 
             defmt::info!("Poll packet sent!");
 
@@ -126,17 +177,19 @@ pub async fn uwb_anchor_task(
                     + node_config.network_topology.tag_addrs.len()) as u32;
             response_recv_deadline =
                 Instant::now() + Duration::from_micros(response_expected_time_us as u64);
-            final_tx_slot = (poll_tx_ts.value()
+            final_tx_slot = ((poll_tx_ts.value()
                 + ((response_expected_time_us + GUARD_INTERVAL_US) as u64 * 638976 / 10))
                 .wrapping_rem(1 << 40)
-                .div_ceil(1 << 8) as u32;
+                .div_ceil(1 << 9)
+                << 1) as u32;
             fsm_waiting = fsm.waiting_for_response(poll_tx_ts.value());
         } else {
             defmt::debug!("Waiting for poll packet from anchor 1...");
             // First wait for the poll packet from the first anchor
             let mut poll_received = None;
+
             while poll_received.is_none() {
-                (dw3000, poll_received) =
+                (dw3000, poll_received, sequence_number) =
                     wait_for_first_poll(dw3000, config, &node_config, &mut int_gpio).await;
             }
 
@@ -149,7 +202,7 @@ pub async fn uwb_anchor_task(
 
             // Need to wrap around full 32-bit
             let delay_tx_time_32 =
-                ((poll_rx_ts.value() + delay_device) % (1 << 40)).div_ceil(1 << 8) as u32;
+                (((poll_rx_ts.value() + delay_device) % (1 << 40)).div_ceil(1 << 9) << 1) as u32;
 
             // Send the poll packet
             dw3000 = send_poll_packet_at(
@@ -158,6 +211,7 @@ pub async fn uwb_anchor_task(
                 &node_config,
                 &mut int_gpio,
                 delay_tx_time_32,
+                sequence_number,
             )
             .await;
 
@@ -173,13 +227,14 @@ pub async fn uwb_anchor_task(
             let response_expected_period = 1000
                 * (node_config.network_topology.anchor_addrs.len()
                     + node_config.network_topology.tag_addrs.len()) as u32;
-            final_tx_slot = (poll_rx_ts.value()
+            final_tx_slot = ((poll_rx_ts.value()
                 + ((response_expected_period + (my_index as u32) * 1000 + GUARD_INTERVAL_US)
                     as u64
                     * 638976
                     / 10))
                 .wrapping_rem(1 << 40)
-                .div_ceil(1 << 8) as u32;
+                .div_ceil(1 << 9)
+                << 1) as u32;
             fsm_waiting = fsm.waiting_for_response((delay_tx_time_32 as u64) << 8);
         }
 
@@ -239,6 +294,7 @@ pub async fn uwb_anchor_task(
             &mut int_gpio,
             &response_rx_ts,
             final_tx_slot,
+            sequence_number,
         )
         .await;
 

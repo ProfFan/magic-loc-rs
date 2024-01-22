@@ -1,25 +1,4 @@
 use embassy_sync::blocking_mutex::raw::RawMutex;
-/// Wait on a function that returns `nb::Result` asynchronously.
-///
-/// When `f` returns `nb::Error::WouldBlock`, this function will wait for
-/// the GPIO output to go high, and then call `f` again.
-// #[inline]
-// pub async fn nonblocking_wait_int<T, E>(
-//     mut f: impl FnMut() -> nb::Result<T, E>,
-//     int_gpio: &mut impl embedded_hal_async::digital::Wait,
-// ) -> Result<T, E> {
-//     loop {
-//         let v = f();
-//         match v {
-//             Ok(t) => return Ok(t),
-//             Err(nb::Error::Other(e)) => return Err(e),
-//             Err(nb::Error::WouldBlock) => {
-//                 int_gpio.wait_for_high().await.unwrap();
-//                 continue;
-//             }
-//         }
-//     }
-// }
 use hal::prelude::nb;
 
 /// Wait on a function that returns `nb::Result` asynchronously that can be cancelled.
@@ -107,3 +86,25 @@ pub async fn nonblocking_wait_int<'a, T: 'a, E, A>(
         }
     }
 }
+
+// /// Wait on a function that returns `nb::Result` asynchronously.
+// ///
+// /// When `f` returns `nb::Error::WouldBlock`, this function will wait for
+// /// the GPIO output to go high, and then call `f` again.
+// #[inline]
+// pub async fn nonblocking_wait_int<T, E>(
+//     mut f: impl FnMut() -> nb::Result<T, E>,
+//     int_gpio: &mut impl embedded_hal_async::digital::Wait,
+// ) -> Result<T, E> {
+//     loop {
+//         let v = f();
+//         match v {
+//             Ok(t) => return Ok(t),
+//             Err(nb::Error::Other(e)) => return Err(e),
+//             Err(nb::Error::WouldBlock) => {
+//                 int_gpio.wait_for_high().await.unwrap();
+//                 continue;
+//             }
+//         }
+//     }
+// }
