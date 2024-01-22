@@ -9,16 +9,16 @@ license = "MIT OR Apache-2.0"
 members = ["lsm6dso"]
 
 [dependencies]
-# esp-wifi = { git = "https://github.com/esp-rs/esp-wifi/", branch = "main", features = [
-#     "esp32s3",
-#     "esp-now",
-#     "phy-enable-usb",
-# ] }
+esp-wifi = { git = "https://github.com/ProfFan/esp-wifi/", rev = "5e3aa6f73c299d67104273e8d3c9e56d5b1046d8", default-features = false, features = [
+    "esp32s3",
+    "esp-now",
+    "phy-enable-usb",
+] }
 dw3000-ng = { package = "dw3000-ng", version = "0.5", features = ["defmt"] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
 magic-loc-protocol = { package = "magic-loc-protocol", git = "ssh://git@github.com/ProfFan/magic-loc-protocol.git", rev = "1367864cc576948c33c983ca63ac97c24ad4e679" }
 
-hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal.git", rev = "02a599ac1ee555fa38d32557e02159acd6c6ab77", features = [
+hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal.git", rev = "296d73114b45da7524924c7442aedc6dac479459", features = [
     "embassy",
     "embassy-executor-interrupt",
     "embassy-executor-thread",
@@ -38,7 +38,7 @@ esp-backtrace = { git = "https://github.com/ProfFan/esp-backtrace", rev = "1206a
     "exception-handler",
     "print-jtag-serial",
     "defmt-espflash",
-    "colors"
+    "colors",
 ] }
 esp-println = { git = "https://github.com/esp-rs/esp-println", branch = "main", default-features = false, features = [
     "esp32s3",
@@ -110,3 +110,8 @@ opt-level = 3
 
 [package.metadata.espflash]
 partition_table = "partitions.csv"
+
+[patch.crates-io]
+esp-hal-common = { git = "https://github.com/ProfFan/esp-hal", rev = "296d73114b45da7524924c7442aedc6dac479459", package = "esp-hal-common" }
+esp32s3-hal = { git = "https://github.com/ProfFan/esp-hal", rev = "296d73114b45da7524924c7442aedc6dac479459", package = "esp32s3-hal" }
+embedded-svc = { git = "https://github.com/esp-rs/embedded-svc", rev = "fb0483e4b3c2bfcada053e8eed8e2e0bde415487", package = "embedded-svc" }
