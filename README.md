@@ -4,6 +4,12 @@
 
 This is the firmware of the muFiu wireless research platform. To run the firmware, please refer to the `esp-rs` toolchain manual.
 
+# Repositories
+
+* Firmware: This repository
+* Hardware (ESP32-S3 Node): https://github.com/ProfFan/MagicLoc-S3-HW
+* Protocol: `magic-loc-protocol`
+
 # LICENSE
 
 ```
