@@ -3,7 +3,7 @@ name = "magic-loc-rs"
 version = "0.1.0"
 authors = ["Fan Jiang <i@fanjiang.me>"]
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license = "Apache-2.0"
 
 [workspace]
 members = ["lsm6dso"]
