@@ -1,5 +1,7 @@
 # The muFiu Firmware
 
+![teaser](assets/teaser.jpg)
+
 This is the firmware of the muFiu wireless research platform. To run the firmware, please refer to the `esp-rs` toolchain manual.
 
 # LICENSE
