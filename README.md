@@ -9,6 +9,7 @@ This is the firmware of the muFiu wireless research platform. To run the firmwar
 * Firmware: This repository
 * Hardware (ESP32-S3 Node): https://github.com/ProfFan/MagicLoc-S3-HW
 * Hardware (DWM3000 Carrier): https://github.com/ProfFan/MagicLoc-DWM3000
+* Central (Parses serial messages from the firmware): https://github.com/ProfFan/magic-loc-central
 * Protocol: `magic-loc-protocol`
 
 # LICENSE
