@@ -16,7 +16,7 @@ esp-wifi = { git = "https://github.com/ProfFan/esp-wifi/", rev = "5e3aa6f73c299d
 ] }
 dw3000-ng = { package = "dw3000-ng", version = "0.5", features = ["defmt"] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
-magic-loc-protocol = { package = "magic-loc-protocol", git = "ssh://git@github.com/ProfFan/magic-loc-protocol.git", rev = "1367864cc576948c33c983ca63ac97c24ad4e679" }
+magic-loc-protocol = { package = "magic-loc-protocol", git = "https://github.com/ProfFan/magic-loc-protocol.git", rev = "25aacb383e95125ddfbffb110beae1ff5c9a095b" }
 
 hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal.git", rev = "296d73114b45da7524924c7442aedc6dac479459", features = [
     "embassy",

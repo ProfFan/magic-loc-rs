@@ -978,7 +978,7 @@ dependencies = [
 [[package]]
 name = "magic-loc-protocol"
 version = "0.3.0"
-source = "git+ssh://git@github.com/ProfFan/magic-loc-protocol.git?rev=1367864cc576948c33c983ca63ac97c24ad4e679#1367864cc576948c33c983ca63ac97c24ad4e679"
+source = "git+https://github.com/ProfFan/magic-loc-protocol.git?rev=25aacb383e95125ddfbffb110beae1ff5c9a095b#25aacb383e95125ddfbffb110beae1ff5c9a095b"
 dependencies = [
  "arbitrary-int",
  "array-init",
@@ -986,7 +986,7 @@ dependencies = [
  "defmt",
  "dw3000-ng",
  "embedded-hal 1.0.0",
- "heapless 0.8.0",
+ "heapless 0.7.17",
  "zerocopy",
  "zerocopy-derive",
 ]
