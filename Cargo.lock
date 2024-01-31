@@ -156,9 +156,9 @@ checksum = "7cfd4a5b862cb6bfcaf4b9803e887a22393dd5c1ac9e2d1e131d516047eabd01"
 
 [[package]]
 name = "bytemuck"
-version = "1.14.0"
+version = "1.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "374d28ec25809ee0e23827c2ab573d729e293f281dfe393500e7ad618baa61c6"
+checksum = "ed2490600f404f2b94c167e31d3ed1d5f3c225a0f3b80230053b3e0b7b962bd9"
 
 [[package]]
 name = "byteorder"
@@ -519,7 +519,22 @@ dependencies = [
 [[package]]
 name = "embedded-svc"
 version = "0.26.4"
-source = "git+https://github.com/esp-rs/embedded-svc?rev=fb0483e4b3c2bfcada053e8eed8e2e0bde415487#fb0483e4b3c2bfcada053e8eed8e2e0bde415487"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55feac55fb81e14c747d5475f05ead553855a133a36f979fa4e7883a240ee829"
+dependencies = [
+ "atomic-waker",
+ "embedded-io",
+ "enumset",
+ "heapless 0.7.17",
+ "no-std-net",
+ "serde",
+]
+
+[[package]]
+name = "embedded-svc"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21535485b1b86b9780ac583f26277011623ae014f6485e3a042eb1249ce50237"
 dependencies = [
  "embedded-io",
  "embedded-io-async",
@@ -588,8 +603,8 @@ dependencies = [
 
 [[package]]
 name = "esp-hal-common"
-version = "0.14.1"
-source = "git+https://github.com/ProfFan/esp-hal.git?rev=296d73114b45da7524924c7442aedc6dac479459#296d73114b45da7524924c7442aedc6dac479459"
+version = "0.15.0"
+source = "git+https://github.com/ProfFan/esp-hal.git?rev=de6db9549ef5a594a31cf5c9c53e15e958c6a7d4#de6db9549ef5a594a31cf5c9c53e15e958c6a7d4"
 dependencies = [
  "basic-toml",
  "bitfield",
@@ -620,6 +635,7 @@ dependencies = [
  "nb 1.1.0",
  "paste",
  "portable-atomic",
+ "rand_core",
  "serde",
  "strum 0.25.0",
  "usb-device",
@@ -631,7 +647,7 @@ dependencies = [
 [[package]]
 name = "esp-hal-procmacros"
 version = "0.8.0"
-source = "git+https://github.com/ProfFan/esp-hal.git?rev=296d73114b45da7524924c7442aedc6dac479459#296d73114b45da7524924c7442aedc6dac479459"
+source = "git+https://github.com/ProfFan/esp-hal.git?rev=de6db9549ef5a594a31cf5c9c53e15e958c6a7d4#de6db9549ef5a594a31cf5c9c53e15e958c6a7d4"
 dependencies = [
  "darling",
  "litrs",
@@ -696,14 +712,15 @@ dependencies = [
 
 [[package]]
 name = "esp-wifi"
-version = "0.2.0"
-source = "git+https://github.com/ProfFan/esp-wifi/?rev=5e3aa6f73c299d67104273e8d3c9e56d5b1046d8#5e3aa6f73c299d67104273e8d3c9e56d5b1046d8"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c6cbcf1a41092dcc9cef4fe9beb45cdc8696d5a00c97bd7ff785de29b69a0b7"
 dependencies = [
  "atomic-waker",
  "cfg-if",
  "critical-section",
  "embedded-io",
- "embedded-svc",
+ "embedded-svc 0.27.0",
  "enumset",
  "esp-wifi-sys",
  "esp32s3-hal",
@@ -721,8 +738,9 @@ dependencies = [
 
 [[package]]
 name = "esp-wifi-sys"
-version = "0.2.0"
-source = "git+https://github.com/ProfFan/esp-wifi/?rev=5e3aa6f73c299d67104273e8d3c9e56d5b1046d8#5e3aa6f73c299d67104273e8d3c9e56d5b1046d8"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "551b510b3944844675fcefa1301b3610fe56faa419bcc05dd0dd0056745c6654"
 dependencies = [
  "anyhow",
 ]
@@ -762,9 +780,11 @@ dependencies = [
 
 [[package]]
 name = "esp32s3-hal"
-version = "0.14.0"
-source = "git+https://github.com/ProfFan/esp-hal.git?rev=296d73114b45da7524924c7442aedc6dac479459#296d73114b45da7524924c7442aedc6dac479459"
+version = "0.15.0"
+source = "git+https://github.com/ProfFan/esp-hal.git?rev=de6db9549ef5a594a31cf5c9c53e15e958c6a7d4#de6db9549ef5a594a31cf5c9c53e15e958c6a7d4"
 dependencies = [
+ "document-features",
+ "embassy-time-driver",
  "esp-hal-common",
 ]
 
@@ -911,9 +931,9 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "indexmap"
-version = "2.1.0"
+version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d530e1a18b1cb4c484e6e34556a0d948706958449fca0cab753d649f2bce3d1f"
+checksum = "433de089bd45971eecf4668ee0ee8f4cec17db4f8bd8f7bc3197a6ce37aa7d9b"
 dependencies = [
  "equivalent",
  "hashbrown",
@@ -986,7 +1006,7 @@ dependencies = [
  "defmt",
  "dw3000-ng",
  "embedded-hal 1.0.0",
- "heapless 0.7.17",
+ "heapless 0.8.0",
  "zerocopy",
  "zerocopy-derive",
 ]
@@ -1012,7 +1032,7 @@ dependencies = [
  "embedded-io",
  "embedded-io-async",
  "embedded-storage",
- "embedded-svc",
+ "embedded-svc 0.26.4",
  "esp-alloc",
  "esp-backtrace",
  "esp-partition-table",
@@ -1051,9 +1071,9 @@ checksum = "523dc4f511e55ab87b694dc30d0f820d60906ef06413f93d4d7a1385599cc149"
 
 [[package]]
 name = "minijinja"
-version = "1.0.11"
+version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "431d72874542d43aba1ca605870eacab134fdeb0c8fe27666ecf4b2662239df2"
+checksum = "6fe0ff215195a22884d867b547c70a0c4815cbbcc70991f281dca604b20d10ce"
 dependencies = [
  "serde",
 ]
@@ -1212,9 +1232,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro-crate"
-version = "2.0.1"
+version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97dc5fea232fc28d2f597b37c4876b348a40e33f3b02cc975c8d006d78d94b1a"
+checksum = "b00f26d3400549137f92511a46ac1cd8ce37cb5598a96d382381458b992a5d24"
 dependencies = [
  "toml_datetime",
  "toml_edit",
@@ -1246,9 +1266,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.76"
+version = "1.0.78"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95fc56cda0b5c3325f5fbbd7ff9fda9e02bb00bb3dac51252d2f1bfa1cb8cc8c"
+checksum = "e2422ad645d89c99f8f3e6b88a9fdeca7fabeac836b1002371c4367c8f984aae"
 dependencies = [
  "unicode-ident",
 ]
@@ -1275,10 +1295,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46b71a9d9206e8b46714c74255adcaea8b11e0350c1d8456165073c3f75fc81a"
 
 [[package]]
-name = "regex"
-version = "1.10.2"
+name = "rand_core"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "380b951a9c5e80ddfd6136919eef32310721aa4aacd4889a8d39124b026ab343"
+checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
+
+[[package]]
+name = "regex"
+version = "1.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b62dbe01f0b06f9d8dc7d49e05a0785f153b00b2c227856282f671e0318c9b15"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -1288,9 +1314,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.3"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f804c7828047e88b2d32e2d7fe5a105da8ee3264f01902f796c8e067dc2483f"
+checksum = "5bb987efffd3c6d0d8f5f89510bb458559eab11e4f869acb20bf845e016259cd"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -1343,18 +1369,18 @@ checksum = "b97ed7a9823b74f99c7742f5336af7be5ecd3eeafcb1507d1fa93347b1d589b0"
 
 [[package]]
 name = "serde"
-version = "1.0.195"
+version = "1.0.196"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63261df402c67811e9ac6def069e4786148c4563f4b50fd4bf30aa370d626b02"
+checksum = "870026e60fa08c69f064aa766c10f10b1d62db9ccd4d0abb206472bee0ce3b32"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.195"
+version = "1.0.196"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46fe8f8603d81ba86327b23a2e9cdf49e1255fb94a4c5f297f6ee0547178ea2c"
+checksum = "33c85360c95e7d137454dc81d9a4ed2b8efd8fbe19cee57357b32b9771fccb67"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1587,9 +1613,9 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "winnow"
-version = "0.5.34"
+version = "0.5.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7cf47b659b318dccbd69cc4797a39ae128f533dce7902a1096044d1967b9c16"
+checksum = "1931d78a9c73861da0134f453bb1f790ce49b2e30eba8410b4b79bac72b46a2d"
 dependencies = [
  "memchr",
 ]
