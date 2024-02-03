@@ -602,9 +602,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "esp-hal-common"
+name = "esp-hal"
 version = "0.15.0"
-source = "git+https://github.com/ProfFan/esp-hal.git?rev=de6db9549ef5a594a31cf5c9c53e15e958c6a7d4#de6db9549ef5a594a31cf5c9c53e15e958c6a7d4"
+source = "git+https://github.com/ProfFan/esp-hal.git?rev=cb5f7836092b7a25dcf2404bf4679c846fde1249#cb5f7836092b7a25dcf2404bf4679c846fde1249"
 dependencies = [
  "basic-toml",
  "bitfield",
@@ -647,7 +647,7 @@ dependencies = [
 [[package]]
 name = "esp-hal-procmacros"
 version = "0.8.0"
-source = "git+https://github.com/ProfFan/esp-hal.git?rev=de6db9549ef5a594a31cf5c9c53e15e958c6a7d4#de6db9549ef5a594a31cf5c9c53e15e958c6a7d4"
+source = "git+https://github.com/ProfFan/esp-hal.git?rev=cb5f7836092b7a25dcf2404bf4679c846fde1249#cb5f7836092b7a25dcf2404bf4679c846fde1249"
 dependencies = [
  "darling",
  "litrs",
@@ -781,11 +781,11 @@ dependencies = [
 [[package]]
 name = "esp32s3-hal"
 version = "0.15.0"
-source = "git+https://github.com/ProfFan/esp-hal.git?rev=de6db9549ef5a594a31cf5c9c53e15e958c6a7d4#de6db9549ef5a594a31cf5c9c53e15e958c6a7d4"
+source = "git+https://github.com/ProfFan/esp-hal.git?rev=cb5f7836092b7a25dcf2404bf4679c846fde1249#cb5f7836092b7a25dcf2404bf4679c846fde1249"
 dependencies = [
  "document-features",
  "embassy-time-driver",
- "esp-hal-common",
+ "esp-hal",
 ]
 
 [[package]]

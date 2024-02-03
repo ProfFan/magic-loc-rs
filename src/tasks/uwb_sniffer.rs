@@ -7,8 +7,8 @@ use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Duration, Instant, Timer};
 use embedded_hal_async::spi as async_spi;
 use hal::{
+    dma::ChannelCreator1,
     dma_descriptors,
-    gdma::ChannelCreator1,
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
     prelude::*,

@@ -22,11 +22,12 @@ use esp_println as _;
 use hal::{
     clock::{ClockControl, Clocks},
     cpu_control::{CpuControl, Stack},
+    dma::Dma,
+    efuse::{Efuse, EfuseField},
     embassy::{
         self,
         executor::{FromCpu1, FromCpu2, InterruptExecutor},
     },
-    gdma::Gdma,
     gpio::{self, GpioPin},
     i2c::I2C,
     interrupt,
@@ -37,7 +38,7 @@ use hal::{
 };
 
 // Stack for the second core
-static mut APP_CORE_STACK: Stack<8192> = Stack::new();
+static mut APP_CORE_STACK: Stack<65536> = Stack::new();
 
 static INT_EXECUTOR_CORE_0: InterruptExecutor<FromCpu1> = InterruptExecutor::new();
 static INT_EXECUTOR_CORE_1: InterruptExecutor<FromCpu2> = InterruptExecutor::new();
@@ -67,16 +68,19 @@ fn init_heap() {
 }
 
 #[embassy_executor::task]
-async fn led_blinker(mut led: GpioPin<hal::gpio::Output<hal::gpio::PushPull>, 7>) -> ! {
-    led.set_high().unwrap();
-
+async fn led_blinker(mut led: GpioPin<hal::gpio::Output<hal::gpio::PushPull>, 7>, id: u32) -> ! {
     loop {
-        led.toggle().unwrap();
+        for _ in 0..id {
+            led.set_high().unwrap();
+            Timer::after(Duration::from_millis(100)).await;
+            led.set_low().unwrap();
+            Timer::after(Duration::from_millis(100)).await;
+        }
         Timer::after(Duration::from_millis(1_000)).await;
     }
 }
 
-#[embassy_executor::task(pool_size = 8)]
+#[embassy_executor::task(pool_size = 12)]
 async fn startup_task(clocks: Clocks<'static>) -> ! {
     let peripherals = unsafe { Peripherals::steal() };
     let spawner = Spawner::for_current_executor().await;
@@ -108,9 +112,13 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     drop(storage);
 
     // let config = config::MagicLocConfig {
-    //     mode: config::Mode::Sniffer,
-    //     uwb_addr: 0x2001,
+    //     mode: config::Mode::Tag,
+    //     uwb_addr: 0x0001,
     //     uwb_pan_id: 0xBEEF,
+    //     enable_imu: config::ImuConfig::LSM6DSO(config::LSM6DSOConfig {
+    //         odr: 0x06,
+    //         fs: 0x02,
+    //     }),
     //     network_topology: config::NetworkTopology {
     //         anchor_addrs: [0x1001, 0x1002, 0x1003, 0x1004, 0x1005, 0x1006, 0x1007, 0x1008],
     //         tag_addrs: [0x0001, 0x0002, 0x0003],
@@ -132,7 +140,10 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
 
     let led = io.pins.gpio7.into_push_pull_output();
 
-    spawner.spawn(led_blinker(led)).ok();
+    // blink the last digit of the UWB address
+    spawner
+        .spawn(led_blinker(led, config.uwb_addr as u32 % 10))
+        .ok();
 
     // 400kHz I2C clock for the SGM41511
     let i2c: I2C<I2C0> = hal::i2c::I2C::new(
@@ -146,7 +157,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     spawner.spawn(battery_manager(i2c)).ok();
 
     // DMA
-    let dma = Gdma::new(peripherals.DMA);
+    let dma = Dma::new(peripherals.DMA);
     let dma_channel = dma.channel0;
 
     // Enable DMA interrupts
@@ -170,7 +181,9 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
         .spawn(tasks::serial_comm_task(serial_jtag))
         .ok();
 
-    if config.mode == config::Mode::Tag && false {
+    Timer::after_millis(10).await;
+
+    if config.mode == config::Mode::Tag && config.enable_imu != config::ImuConfig::None {
         defmt::info!("Mode = TAG, starting IMU");
 
         // IMU Task
@@ -179,13 +192,12 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
                 .with_pins(
                     Some(io.pins.gpio33),
                     Some(io.pins.gpio47),
-                    Some(io.pins.gpio17),
+                    Some(io.pins.gpio40), // GPIO 17 for old boards with bad pinout
                     gpio::NO_PIN,
                 );
 
         // IMU INT
         let int_imu = io.pins.gpio48.into_pull_down_input();
-        // int_imu.listen(hal::gpio::Event::HighLevel);
 
         core0_spawner
             .spawn(tasks::imu_task(
@@ -213,12 +225,6 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     let mut cpu_control = CpuControl::new(system.cpu_control);
     let cpu1_fnctn = move || {
         let spawner = INT_EXECUTOR_CORE_1.start(interrupt::Priority::Priority1);
-
-        // spawner
-        //     .spawn(tasks::uwb_task(
-        //         dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000,
-        //     ))
-        //     .ok();
 
         match &config.mode {
             config::Mode::Anchor => {

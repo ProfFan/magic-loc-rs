@@ -110,7 +110,7 @@ where
             .await
             .map_err(|e| Error::Transfer(e))?;
 
-        defmt::debug!("Read: {:?}", buffer);
+        defmt::trace!("Read: {:#x}, {:#x}", buffer, write_buffer);
 
         Ok(r)
     }
@@ -125,12 +125,13 @@ where
         f(&mut w);
 
         let buffer = R::buffer(&mut w);
+        let _ = init_header::<R>(true, buffer);
 
-        let header_size = init_header::<R>(true, buffer);
-
-        async_spi::SpiDevice::write(&mut self.0.bus, &buffer[header_size..])
+        async_spi::SpiDevice::write(&mut self.0.bus, &buffer[..])
             .await
             .map_err(|e| Error::Transfer(e))?;
+
+        defmt::trace!("Write: {:#x}", buffer);
 
         Ok(())
     }
@@ -150,11 +151,13 @@ where
         f(&mut r, &mut w);
 
         let buffer = <R as Writable>::buffer(&mut w);
-        let header_size = init_header::<R>(true, buffer);
+        let _ = init_header::<R>(true, buffer);
 
-        async_spi::SpiDevice::write(&mut self.0.bus, &buffer[header_size..])
+        async_spi::SpiDevice::write(&mut self.0.bus, &buffer[..])
             .await
             .map_err(Error::Transfer)?;
+
+        defmt::trace!("Modify: {:#x}", buffer);
 
         Ok(())
     }

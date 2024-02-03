@@ -140,6 +140,8 @@ where
         )
         .unwrap();
 
+    defmt::debug!("Sent frame!");
+
     let result = nonblocking_wait(
         || {
             defmt::debug!("Waiting for send...");
@@ -224,12 +226,15 @@ where
                 if let Some(_) = index_tag {
                     if let Some(payload) = frame.payload() {
                         defmt::debug!("Payload: {:#X}", payload);
-                        if let Some(final_packet) = FinalPacket::ref_from(&payload[..21]) {
-                            let header = final_packet.header();
-                            if header.packet_type() == magic_loc_protocol::packet::PacketType::Final
-                            {
-                                defmt::debug!("Final packet received!");
-                                final_received = Some((src_addr, final_packet.clone(), rx_ts));
+                        if payload.len() >= 21 {
+                            if let Some(final_packet) = FinalPacket::ref_from(&payload[..21]) {
+                                let header = final_packet.header();
+                                if header.packet_type()
+                                    == magic_loc_protocol::packet::PacketType::Final
+                                {
+                                    defmt::debug!("Final packet received!");
+                                    final_received = Some((src_addr, final_packet.clone(), rx_ts));
+                                }
                             }
                         }
                     }

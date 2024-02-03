@@ -22,7 +22,13 @@ where
     INT: embedded_hal_async::digital::Wait,
     CANCEL: Future,
 {
-    let mut rxing = dw3000.receive(dwm_config).expect("Failed to receive.");
+    defmt::trace!("Listening for packet...");
+    let mut rxing = dw3000.receive(dwm_config).unwrap_or_else(|e| {
+        defmt::error!("Failed to start receiving: {:?}", e);
+        panic!("Failed to start receiving");
+    });
+
+    defmt::trace!("RX mode set!");
 
     let mut buf = [0u8; 128];
 
@@ -31,8 +37,8 @@ where
             || {
                 defmt::trace!("Waiting for receive...");
                 let status = rxing.r_wait_buf(&mut buf);
-                let sys_status = rxing.ll().sys_status().read().unwrap();
-                defmt::trace!("SYS_STATUS: {:?}", sys_status);
+                // let sys_status = rxing.ll().sys_status().read().unwrap();
+                // defmt::trace!("SYS_STATUS: {:?}", sys_status);
                 return status;
             },
             &mut int_gpio,

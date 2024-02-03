@@ -5,8 +5,8 @@ use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Duration, Instant, Ticker, Timer};
 use hal::{
+    dma::ChannelCreator1,
     dma_descriptors,
-    gdma::ChannelCreator1,
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
     prelude::*,

@@ -4,7 +4,7 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Instant, Timer};
 use embedded_hal_async::digital::Wait;
 use hal::{
-    gdma::ChannelCreator0,
+    dma::{ChannelCreator0, DmaDescriptor},
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     macros::ram,
     peripherals::SPI3,
@@ -32,8 +32,8 @@ pub async fn imu_task(
 ) -> ! {
     defmt::info!("IMU Task Start!");
 
-    let mut descriptors = [0u32; 8 * 3];
-    let mut rx_descriptors = [0u32; 8 * 3];
+    let mut descriptors = [DmaDescriptor::EMPTY; 8 * 3];
+    let mut rx_descriptors = [DmaDescriptor::EMPTY; 8 * 3];
 
     let bus = bus.with_dma(dma_channel.configure(
         false,
@@ -42,7 +42,7 @@ pub async fn imu_task(
         hal::dma::DmaPriority::Priority0,
     ));
 
-    let bus = FlashSafeDma::<_, 64>::new(bus);
+    // let bus = FlashSafeDma::<_, 128>::new(bus);
 
     let bus = Mutex::<NoopRawMutex, _>::new(bus);
     let device = SpiDevice::new(&bus, chip_select);
@@ -127,11 +127,14 @@ pub async fn imu_task(
     // Read once to clear the interrupt
     let _ = imu.ll().all_readouts().async_read().await.unwrap();
 
+    // Enable the interrupt
+    hal::gpio::Pin::listen(&mut int1, hal::gpio::Event::RisingEdge);
+
     let mut count: i32 = 0;
     let mut ts_now = Instant::now();
     loop {
         // Wait for the interrupt
-        int1.wait_for_high().await.unwrap();
+        int1.wait_for_rising_edge().await.unwrap();
 
         let mut imu_data = ImuReport::default();
 
@@ -148,7 +151,7 @@ pub async fn imu_task(
         imu_data.accel[1] = all_readouts.outy_a() as u32;
         imu_data.accel[2] = all_readouts.outz_a() as u32;
 
-        defmt::debug!(
+        defmt::trace!(
             "Gyro: {} {} {}, Accel {} {} {}",
             (imu_data.gyro[0] as i16),
             (imu_data.gyro[1] as i16),

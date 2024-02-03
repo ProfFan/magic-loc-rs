@@ -11,8 +11,8 @@ use esp_println::Printer;
 use hal::{interrupt, peripherals::Interrupt, usb_serial_jtag::UsbSerialJtag};
 
 static mut USB_SERIAL_READY: bool = false;
-static mut USB_SERIAL_TX_BUFFER: bbqueue::BBBuffer<8192> = bbqueue::BBBuffer::new();
-static mut USB_SERIAL_TX_PRODUCER: Option<bbqueue::Producer<'static, 8192>> = None;
+static mut USB_SERIAL_TX_BUFFER: bbqueue::BBBuffer<2048> = bbqueue::BBBuffer::new();
+static mut USB_SERIAL_TX_PRODUCER: Option<bbqueue::Producer<'static, 2048>> = None;
 
 static mut WAKER: AtomicWaker = AtomicWaker::new();
 
@@ -143,8 +143,6 @@ fn do_write(bytes: &[u8]) {
 /// We will also need to acquire the critical section when we write to the USB serial buffer
 /// to prevent interleaving with the defmt logger
 pub fn write_to_usb_serial_buffer(bytes: &[u8]) -> Result<(), ()> {
-    let restore = unsafe { critical_section::acquire() };
-
     let grant = unsafe { USB_SERIAL_TX_PRODUCER.as_mut() }
         .unwrap()
         .grant_exact(bytes.len());
@@ -155,13 +153,9 @@ pub fn write_to_usb_serial_buffer(bytes: &[u8]) -> Result<(), ()> {
 
         unsafe { WAKER.wake() };
 
-        unsafe { critical_section::release(restore) };
-
         Ok(())
     } else {
         unsafe { WAKER.wake() };
-
-        unsafe { critical_section::release(restore) };
 
         Err(())
     }
@@ -172,7 +166,7 @@ pub fn write_to_usb_serial_buffer(bytes: &[u8]) -> Result<(), ()> {
 pub async fn serial_comm_task(mut usb_serial: UsbSerialJtag<'static>) {
     defmt::info!("Serial Task Start!");
 
-    interrupt::enable(Interrupt::USB_DEVICE, interrupt::Priority::Priority2).unwrap();
+    interrupt::enable(Interrupt::USB_DEVICE, interrupt::Priority::Priority1).unwrap();
 
     // Initialize the BBQueue
     let (producer, mut consumer) = unsafe { USB_SERIAL_TX_BUFFER.try_split().unwrap() };
@@ -181,7 +175,7 @@ pub async fn serial_comm_task(mut usb_serial: UsbSerialJtag<'static>) {
     // TX async block
     let tx = async {
         loop {
-            let tx_incoming = poll_fn(|cx| -> Poll<Result<GrantR<'_, 8192>, ()>> {
+            let tx_incoming = poll_fn(|cx| -> Poll<Result<GrantR<'_, 2048>, ()>> {
                 unsafe { &WAKER }.register(cx.waker());
 
                 if let Ok(grant) = consumer.read() {
@@ -195,11 +189,13 @@ pub async fn serial_comm_task(mut usb_serial: UsbSerialJtag<'static>) {
             if let Ok(grant) = tx_incoming {
                 let bytes = grant.buf();
 
-                let len = bytes.len();
+                let len = bytes.len().clamp(0, 256);
                 usb_serial.write_all(bytes).await.unwrap();
 
                 grant.release(len);
             }
+
+            embassy_futures::yield_now().await;
         }
     };
 

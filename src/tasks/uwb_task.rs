@@ -6,8 +6,8 @@ use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Duration, Instant, Timer};
 use hal::{
+    dma::ChannelCreator1,
     dma_descriptors,
-    gdma::ChannelCreator1,
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
     prelude::*,
@@ -52,14 +52,14 @@ pub async fn uwb_task(
 ) -> ! {
     defmt::info!("UWB Task Start!");
 
-    let (mut dma_tx, mut dma_rx) = dma_descriptors!(32000);
+    // let (mut dma_tx, mut dma_rx) = dma_descriptors!(32000);
 
-    let bus = bus.with_dma(dma_channel.configure(
-        false,
-        &mut dma_tx,
-        &mut dma_rx,
-        hal::dma::DmaPriority::Priority0,
-    ));
+    // let bus = bus.with_dma(dma_channel.configure(
+    //     false,
+    //     &mut dma_tx,
+    //     &mut dma_rx,
+    //     hal::dma::DmaPriority::Priority0,
+    // ));
 
     // Enable DMA interrupts
     hal::interrupt::enable(
@@ -73,7 +73,7 @@ pub async fn uwb_task(
     )
     .unwrap();
 
-    let bus = FlashSafeDma::<_, 32000>::new(bus);
+    // let bus = FlashSafeDma::<_, 32000>::new(bus);
 
     let bus = NoopMutex::new(RefCell::new(bus));
 
@@ -145,9 +145,17 @@ pub async fn uwb_task(
             // To prevent loss of sync if we miss the first anchor's POLL, since the TX time
             // for all anchors is all determined by the first frame, we also use the
             // other frames to calculate the TX time for the response
+            defmt::debug!("Waiting for poll frame...");
+
             let rx_addr_time;
-            (dw3000, rx_addr_time) =
-                wait_for_poll(dw3000, uwb_config, &config, &mut int_gpio, pending::<()>()).await;
+            (dw3000, rx_addr_time) = wait_for_poll(
+                dw3000,
+                uwb_config,
+                &config,
+                &mut int_gpio,
+                Timer::after_millis(10),
+            )
+            .await;
 
             if let Some((rx_addr, tx_time, rx_time, sequence_number_)) = rx_addr_time {
                 // Get the index of the anchor
@@ -270,8 +278,16 @@ pub async fn uwb_task(
         let timeout_time =
             Instant::now() + Duration::from_micros(last_final_expected_timeout as u64);
 
+        defmt::debug!(
+            "Timeout time = {:?}, now = {:?}",
+            timeout_time,
+            Instant::now()
+        );
+
         // Wait for the final frame from the anchors
         loop {
+            defmt::debug!("Waiting for final frame...");
+
             let timeout_future = Timer::at(timeout_time);
 
             let (result, recv_ok);

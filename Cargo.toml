@@ -18,7 +18,7 @@ dw3000-ng = { package = "dw3000-ng", version = "0.5", features = ["defmt"] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
 magic-loc-protocol = { package = "magic-loc-protocol", git = "https://github.com/ProfFan/magic-loc-protocol.git", rev = "25aacb383e95125ddfbffb110beae1ff5c9a095b" }
 
-hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal.git", rev = "de6db9549ef5a594a31cf5c9c53e15e958c6a7d4", features = [
+hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal.git", rev = "cb5f7836092b7a25dcf2404bf4679c846fde1249", features = [
     "embassy",
     "embassy-executor-interrupt",
     "embassy-executor-thread",
@@ -112,5 +112,5 @@ opt-level = 3
 partition_table = "partitions.csv"
 
 [patch.crates-io]
-esp-hal-common = { git = "https://github.com/ProfFan/esp-hal", rev = "de6db9549ef5a594a31cf5c9c53e15e958c6a7d4", package = "esp-hal-common" }
-esp32s3-hal = { git = "https://github.com/ProfFan/esp-hal", rev = "de6db9549ef5a594a31cf5c9c53e15e958c6a7d4", package = "esp32s3-hal" }
+esp-hal = { git = "https://github.com/ProfFan/esp-hal", rev = "cb5f7836092b7a25dcf2404bf4679c846fde1249", package = "esp-hal" }
+esp32s3-hal = { git = "https://github.com/ProfFan/esp-hal", rev = "cb5f7836092b7a25dcf2404bf4679c846fde1249", package = "esp32s3-hal" }

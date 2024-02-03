@@ -54,7 +54,7 @@ pub struct CirAcquisitionOptions {
     pub num_samples: u8,
 }
 
-#[derive(Default, Debug, Clone, Copy, Format)]
+#[derive(Default, Debug, Clone, Copy, Format, PartialEq)]
 #[binrw]
 pub struct LSM6DSOConfig {
     pub odr: u8,
@@ -62,12 +62,35 @@ pub struct LSM6DSOConfig {
 }
 
 /// IMU configuration options
-#[derive(Default, Debug, Clone, Copy, Format)]
+#[derive(Default, Debug, Clone, Copy, Format, PartialEq)]
 #[binrw]
 pub enum ImuConfig {
     #[default]
+    #[brw(magic(0u8))]
     None,
+    #[brw(magic(1u8))]
     LSM6DSO(LSM6DSOConfig),
+}
+
+/// Identifier of the board
+#[derive(Default, Debug, Clone, Copy, Format)]
+#[binrw]
+#[brw(little)]
+pub struct BoardIdentifier {
+    pub major: u8,
+    pub minor: u8,
+    pub serial: u16,
+}
+
+/// BLOCK_USER_DATA eFuse block
+/// This block is used to store the board identifier
+/// and the calibration data (if any)
+#[derive(Default, Debug, Clone, Copy, Format)]
+#[binrw]
+#[brw(magic = b"MLOC", little)]
+pub struct EfuseDataBlock {
+    pub board_id: BoardIdentifier,
+    pub resv: [u8; 24],
 }
 
 /// Config struct saved to flash
@@ -84,7 +107,7 @@ pub struct MagicLocConfig {
 }
 
 impl MagicLocConfig {
-    pub const MAX_SIZE: usize = 128;
+    pub const MAX_SIZE: usize = 256;
 }
 
 /// Power-on configuration loader
@@ -98,12 +121,12 @@ pub async fn load_config() -> Option<MagicLocConfig> {
         .read(unsafe { STORAGE_OFFSET }, &mut buf)
         .map_err(|_| ())
         .and_then(|_| -> Result<MagicLocConfig, ()> {
-            let config = MagicLocConfig::read(&mut Cursor::new(&buf)).map_err(|_| ());
+            let config = MagicLocConfig::read(&mut Cursor::new(&buf));
 
             if config.is_err() {
                 defmt::error!(
-                    "Failed, reason {:?}",
-                    config.expect_err("Failed to parse config")
+                    "Failed, reason {}",
+                    defmt::Display2Format(&config.err().unwrap())
                 );
                 defmt::error!("Buffer = {:x}", &buf);
                 return Err(());
@@ -126,7 +149,7 @@ pub async fn write_config(config: &MagicLocConfig) -> Result<(), ()> {
         .write(unsafe { STORAGE_OFFSET }, &buf)
         .map_err(|_| ())?;
 
-    defmt::info!("Saved config!");
+    defmt::info!("Saved config!, buffer = {:x}", &buf);
 
     return Ok(());
 }
