@@ -23,8 +23,7 @@ where
             Err(nb::Error::Other(e)) => return Ok(Err(e)),
             Err(nb::Error::WouldBlock) => {
                 let result =
-                    embassy_futures::select::select(int_gpio.wait_for_rising_edge(), cancel.wait())
-                        .await;
+                    embassy_futures::select::select(int_gpio.wait_for_high(), cancel.wait()).await;
 
                 if let embassy_futures::select::Either::Second(_) = result {
                     return Err(());
@@ -52,8 +51,8 @@ pub async fn nonblocking_wait<T, E>(
             Ok(t) => return Ok(t),
             Err(nb::Error::Other(e)) => return Err(e),
             Err(nb::Error::WouldBlock) => {
-                defmt::trace!("Waiting for rising edge...");
-                int_gpio.wait_for_rising_edge().await.unwrap();
+                defmt::trace!("Waiting for high...");
+                int_gpio.wait_for_high().await.unwrap();
                 continue;
             }
         }
@@ -81,7 +80,7 @@ pub async fn nonblocking_wait_int<'a, T: 'a, E, A>(
             Ok(t) => return Ok(t),
             Err((nb::Error::Other(e), _)) => return Err(e),
             Err((nb::Error::WouldBlock, arg_)) => {
-                int_gpio.wait_for_rising_edge().await.unwrap();
+                int_gpio.wait_for_high().await.unwrap();
                 arg = arg_;
                 continue;
             }

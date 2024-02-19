@@ -1,6 +1,8 @@
+#![deny(unsafe_op_in_unsafe_fn)]
+
 //! Serial communication module
 
-use core::{future::poll_fn, task::Poll};
+use core::{future::poll_fn, sync::atomic::AtomicBool, task::Poll};
 
 use bbqueue::{self, GrantR};
 use critical_section::RestoreState;
@@ -10,7 +12,7 @@ use embedded_io_async::Write;
 use esp_println::Printer;
 use hal::{interrupt, peripherals::Interrupt, usb_serial_jtag::UsbSerialJtag};
 
-static mut USB_SERIAL_READY: bool = false;
+static mut USB_SERIAL_READY: AtomicBool = AtomicBool::new(false);
 static mut USB_SERIAL_TX_BUFFER: bbqueue::BBBuffer<2048> = bbqueue::BBBuffer::new();
 static mut USB_SERIAL_TX_PRODUCER: Option<bbqueue::Producer<'static, 2048>> = None;
 
@@ -36,7 +38,7 @@ unsafe impl defmt::Logger for GlobalLogger {
 
         unsafe { USB_SERIAL_TX_BUFFER_FULL = false };
 
-        if unsafe { USB_SERIAL_READY } {
+        if unsafe { USB_SERIAL_READY.load(core::sync::atomic::Ordering::Relaxed) } {
             // Just push the bytes to the USB serial buffer
             let grant = unsafe { USB_SERIAL_TX_PRODUCER.as_mut() }
                 .unwrap()
@@ -68,9 +70,11 @@ unsafe impl defmt::Logger for GlobalLogger {
     }
 
     unsafe fn flush() {
-        if unsafe { USB_SERIAL_READY } {
+        if unsafe { USB_SERIAL_READY.load(core::sync::atomic::Ordering::Relaxed) } {
             // Do nothing
-            WAKER.wake();
+            unsafe {
+                WAKER.wake();
+            }
         } else {
             // Early boot
             Printer.flush();
@@ -78,12 +82,12 @@ unsafe impl defmt::Logger for GlobalLogger {
     }
 
     unsafe fn release() {
-        if unsafe { USB_SERIAL_READY } {
+        if unsafe { USB_SERIAL_READY.load(core::sync::atomic::Ordering::Relaxed) } {
             if unsafe { USB_SERIAL_TX_BUFFER_FULL } {
                 // Do nothing
             } else {
-                ENCODER.end_frame(|bytes| {
-                    let grant = USB_SERIAL_TX_PRODUCER
+                unsafe { &mut ENCODER }.end_frame(|bytes| {
+                    let grant = unsafe { &mut USB_SERIAL_TX_PRODUCER }
                         .as_mut()
                         .unwrap()
                         .grant_exact(bytes.len());
@@ -102,20 +106,22 @@ unsafe impl defmt::Logger for GlobalLogger {
         } else {
             // safety: accessing the `static mut` is OK because we have acquired a critical
             // section.
-            ENCODER.end_frame(do_write);
+            unsafe { &mut ENCODER }.end_frame(do_write);
 
             Printer.flush();
         }
 
-        let restore = CS_RESTORE;
+        unsafe {
+            critical_section::release(CS_RESTORE);
 
-        critical_section::release(restore);
+            CS_RESTORE = RestoreState::invalid();
+        }
     }
 
     unsafe fn write(bytes: &[u8]) {
-        if unsafe { USB_SERIAL_READY } {
-            ENCODER.write(bytes, |bytes| {
-                let grant = USB_SERIAL_TX_PRODUCER
+        if unsafe { USB_SERIAL_READY.load(core::sync::atomic::Ordering::Relaxed) } {
+            unsafe { &mut ENCODER }.write(bytes, |bytes| {
+                let grant = unsafe { &mut USB_SERIAL_TX_PRODUCER }
                     .as_mut()
                     .unwrap()
                     .grant_exact(bytes.len());
@@ -130,7 +136,7 @@ unsafe impl defmt::Logger for GlobalLogger {
         } else {
             // safety: accessing the `static mut` is OK because we have acquired a critical
             // section.
-            ENCODER.write(bytes, do_write);
+            unsafe { &mut ENCODER }.write(bytes, do_write);
         }
     }
 }
@@ -176,11 +182,11 @@ pub async fn serial_comm_task(mut usb_serial: UsbSerialJtag<'static>) {
     let tx = async {
         loop {
             let tx_incoming = poll_fn(|cx| -> Poll<Result<GrantR<'_, 2048>, ()>> {
-                unsafe { &WAKER }.register(cx.waker());
-
                 if let Ok(grant) = consumer.read() {
                     Poll::Ready(Ok(grant))
                 } else {
+                    unsafe { &WAKER }.register(cx.waker());
+
                     Poll::Pending
                 }
             })
@@ -189,17 +195,17 @@ pub async fn serial_comm_task(mut usb_serial: UsbSerialJtag<'static>) {
             if let Ok(grant) = tx_incoming {
                 let bytes = grant.buf();
 
-                let len = bytes.len().clamp(0, 256);
-                usb_serial.write_all(bytes).await.unwrap();
+                let len = bytes.len().clamp(0, 64);
+                let written = usb_serial.write(&bytes[..len]).await.unwrap();
 
-                grant.release(len);
+                grant.release(written);
             }
 
             embassy_futures::yield_now().await;
         }
     };
 
-    unsafe { USB_SERIAL_READY = true };
+    unsafe { USB_SERIAL_READY.store(true, core::sync::atomic::Ordering::Relaxed) };
 
     tx.await;
 }

@@ -267,7 +267,7 @@ where
     )
     .await;
 
-    return (ready, poll_received, sequence_number);
+    (ready, poll_received, sequence_number)
 }
 
 /// Wait for the response packet from the tag
@@ -330,7 +330,7 @@ where
     )
     .await;
 
-    return (ready, response_received, result.is_err());
+    (ready, response_received, result.is_err())
 }
 
 /// Send the FINAL packet
@@ -352,7 +352,7 @@ where
     let final_packet = magic_loc_protocol::packet::FinalPacket::new(
         magic_loc_protocol::packet::PacketType::Final,
         u4::new(0),
-        core::array::from_fn(|i| u40::new(response_rx_ts[i].unwrap_or(0)).into()),
+        core::array::from_fn(|i| u40::new(response_rx_ts[i].unwrap_or(0))),
         u40::new((final_tx_slot as u64) << 8),
     );
 

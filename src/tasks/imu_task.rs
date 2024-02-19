@@ -128,13 +128,13 @@ pub async fn imu_task(
     let _ = imu.ll().all_readouts().async_read().await.unwrap();
 
     // Enable the interrupt
-    hal::gpio::Pin::listen(&mut int1, hal::gpio::Event::RisingEdge);
+    hal::gpio::Pin::listen(&mut int1, hal::gpio::Event::HighLevel);
 
     let mut count: i32 = 0;
     let mut ts_now = Instant::now();
     loop {
         // Wait for the interrupt
-        int1.wait_for_rising_edge().await.unwrap();
+        int1.wait_for_high().await.unwrap();
 
         let mut imu_data = ImuReport::default();
 
@@ -177,7 +177,7 @@ pub async fn imu_task(
         let mut encoder = defmt::Encoder::new();
         let mut cursor = 0;
         let mut write_bytes = |bytes: &[u8]| {
-            data.as_mut()[cursor..cursor + bytes.len()].copy_from_slice(bytes);
+            data[cursor..cursor + bytes.len()].copy_from_slice(bytes);
             cursor += bytes.len();
         };
         encoder.start_frame(&mut write_bytes);

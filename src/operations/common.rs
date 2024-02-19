@@ -36,10 +36,7 @@ where
         nonblocking_wait(
             || {
                 defmt::trace!("Waiting for receive...");
-                let status = rxing.r_wait_buf(&mut buf);
-                // let sys_status = rxing.ll().sys_status().read().unwrap();
-                // defmt::trace!("SYS_STATUS: {:?}", sys_status);
-                return status;
+                rxing.r_wait_buf(&mut buf)
             },
             &mut int_gpio,
         ),
@@ -71,5 +68,5 @@ where
     rxing.force_idle().unwrap();
     dw3000 = rxing.finish_receiving().unwrap();
 
-    return (dw3000, Ok(()));
+    (dw3000, Ok(()))
 }

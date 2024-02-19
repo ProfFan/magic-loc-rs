@@ -66,7 +66,7 @@ async fn indirect_reg_read<SPI>(
     defmt::trace!("Indirect data read!");
 }
 
-#[embassy_executor::task(pool_size = 2)]
+#[embassy_executor::task]
 #[ram]
 pub async fn uwb_sniffer(
     bus: Spi<'static, SPI2, FullDuplexMode>,

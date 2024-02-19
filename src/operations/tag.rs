@@ -41,7 +41,7 @@ where
         &mut int_gpio,
         cancel,
         |buf, rx_ts| {
-            let frame = Ieee802154Frame::new_checked(&buf[..]);
+            let frame = Ieee802154Frame::new_checked(buf);
 
             if frame.is_err() {
                 return;
@@ -84,7 +84,7 @@ where
     )
     .await;
 
-    return (ready, poll_received);
+    (ready, poll_received)
 }
 
 #[ram]
@@ -203,7 +203,7 @@ where
         &mut int_gpio,
         cancel,
         |buf, rx_ts| {
-            let frame = Ieee802154Frame::new_checked(&buf[..]);
+            let frame = Ieee802154Frame::new_checked(buf);
 
             if frame.is_err() {
                 return;
@@ -223,7 +223,7 @@ where
                     .anchor_addrs
                     .iter()
                     .position(|&x| x == src_addr);
-                if let Some(_) = index_tag {
+                if index_tag.is_some() {
                     if let Some(payload) = frame.payload() {
                         defmt::debug!("Payload: {:#X}", payload);
                         if payload.len() >= 21 {
@@ -233,7 +233,7 @@ where
                                     == magic_loc_protocol::packet::PacketType::Final
                                 {
                                     defmt::debug!("Final packet received!");
-                                    final_received = Some((src_addr, final_packet.clone(), rx_ts));
+                                    final_received = Some((src_addr, *final_packet, rx_ts));
                                 }
                             }
                         }

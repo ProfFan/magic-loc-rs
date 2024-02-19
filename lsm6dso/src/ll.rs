@@ -127,7 +127,7 @@ where
         let buffer = R::buffer(&mut w);
         let _ = init_header::<R>(true, buffer);
 
-        async_spi::SpiDevice::write(&mut self.0.bus, &buffer[..])
+        async_spi::SpiDevice::write(&mut self.0.bus, buffer)
             .await
             .map_err(|e| Error::Transfer(e))?;
 
@@ -153,7 +153,7 @@ where
         let buffer = <R as Writable>::buffer(&mut w);
         let _ = init_header::<R>(true, buffer);
 
-        async_spi::SpiDevice::write(&mut self.0.bus, &buffer[..])
+        async_spi::SpiDevice::write(&mut self.0.bus, buffer)
             .await
             .map_err(Error::Transfer)?;
 

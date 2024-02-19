@@ -18,11 +18,13 @@ dw3000-ng = { package = "dw3000-ng", version = "0.5", features = ["defmt"] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
 magic-loc-protocol = { package = "magic-loc-protocol", git = "https://github.com/ProfFan/magic-loc-protocol.git", rev = "25aacb383e95125ddfbffb110beae1ff5c9a095b" }
 
-hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal.git", rev = "cb5f7836092b7a25dcf2404bf4679c846fde1249", features = [
+hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal.git", rev = "e79616960cad67ad19b32c1d228378dc93bdc799", default-features = false, features = [
+    "rt",
+    "vectored",
     "embassy",
     "embassy-executor-interrupt",
     "embassy-executor-thread",
-    "embassy-time-systick",
+    "embassy-time-timg0",
     "async",
     "defmt",
 ] }
@@ -32,13 +34,13 @@ embedded-hal = "1.0.0"
 embedded-hal-async = "1.0.0"
 embedded-hal-bus = "0.1.0"
 
-esp-backtrace = { git = "https://github.com/ProfFan/esp-backtrace", rev = "1206aa40e16606045dacb38134cc9df4e39f2f62", default-features = false, features = [
+esp-backtrace = { git = "https://github.com/esp-rs/esp-backtrace", branch = "main", default-features = false, features = [
     "esp32s3",
     "panic-handler",
     "exception-handler",
-    "print-jtag-serial",
-    "defmt-espflash",
+    "defmt",
     "colors",
+    "halt-cores",
 ] }
 esp-println = { git = "https://github.com/esp-rs/esp-println", branch = "main", default-features = false, features = [
     "esp32s3",
@@ -82,14 +84,14 @@ smoltcp = { version = "0.11.0", default-features = false, features = [
     "socket-raw",
     "socket-dhcpv4",
 ] }
-embedded-svc = { version = "0.26.4", default-features = false, features = [] }
+embedded-svc = { version = "0.27.0", default-features = false, features = [] }
 embedded-io = "0.6.1"
 embedded-io-async = "0.6.1"
 heapless = { version = "0.8", default-features = false, features = [
     "defmt-03",
 ] }
 embassy-executor = { version = "0.5.0", features = ["nightly"] }
-embassy-time = { version = "0.3.0", features = ["defmt"] }
+embassy-time = { version = "0.3.0", features = ["defmt", "generic-queue-8"] }
 embassy-futures = "*"
 embassy-sync = "*"
 embassy-embedded-hal = { version = "0.1", features = ["defmt"] }
@@ -105,12 +107,13 @@ opt-level = 3
 [profile.dev]
 lto = "thin"
 [profile.release]
-lto = "fat"
+lto = "thin"
 opt-level = 3
+debug = true
 
 [package.metadata.espflash]
 partition_table = "partitions.csv"
 
 [patch.crates-io]
-esp-hal = { git = "https://github.com/ProfFan/esp-hal", rev = "cb5f7836092b7a25dcf2404bf4679c846fde1249", package = "esp-hal" }
-esp32s3-hal = { git = "https://github.com/ProfFan/esp-hal", rev = "cb5f7836092b7a25dcf2404bf4679c846fde1249", package = "esp32s3-hal" }
+esp-hal = { git = "https://github.com/ProfFan/esp-hal", rev = "e79616960cad67ad19b32c1d228378dc93bdc799", package = "esp-hal" }
+esp32s3-hal = { git = "https://github.com/ProfFan/esp-hal", rev = "e79616960cad67ad19b32c1d228378dc93bdc799", package = "esp32s3-hal" }

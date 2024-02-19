@@ -18,6 +18,8 @@ pub enum Mode {
     Tag = 1,
     /// Device is in sniffer mode
     Sniffer = 2,
+    /// Device is in sync trigger mode
+    SyncTrigger = 3,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -151,5 +153,5 @@ pub async fn write_config(config: &MagicLocConfig) -> Result<(), ()> {
 
     defmt::info!("Saved config!, buffer = {:x}", &buf);
 
-    return Ok(());
+    Ok(())
 }

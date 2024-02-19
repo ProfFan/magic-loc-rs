@@ -19,6 +19,8 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_println as _;
 
+use esp_wifi;
+
 use hal::{
     clock::{ClockControl, Clocks},
     cpu_control::{CpuControl, Stack},
@@ -26,7 +28,7 @@ use hal::{
     efuse::{Efuse, EfuseField},
     embassy::{
         self,
-        executor::{FromCpu1, FromCpu2, InterruptExecutor},
+        executor::{FromCpu1, FromCpu2, FromCpu3, InterruptExecutor},
     },
     gpio::{self, GpioPin},
     i2c::I2C,
@@ -42,6 +44,7 @@ static mut APP_CORE_STACK: Stack<65536> = Stack::new();
 
 static INT_EXECUTOR_CORE_0: InterruptExecutor<FromCpu1> = InterruptExecutor::new();
 static INT_EXECUTOR_CORE_1: InterruptExecutor<FromCpu2> = InterruptExecutor::new();
+static INT_EXECUTOR_CORE_0_P3: InterruptExecutor<FromCpu3> = InterruptExecutor::new();
 
 #[interrupt]
 fn FROM_CPU_INTR1() {
@@ -51,6 +54,11 @@ fn FROM_CPU_INTR1() {
 #[interrupt]
 fn FROM_CPU_INTR2() {
     unsafe { INT_EXECUTOR_CORE_1.on_interrupt() }
+}
+
+#[interrupt]
+fn FROM_CPU_INTR3() {
+    unsafe { INT_EXECUTOR_CORE_0_P3.on_interrupt() }
 }
 
 use crate::tasks::battery_manager;
@@ -108,9 +116,6 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
         config::STORAGE_OFFSET = storage_offset;
     }
 
-    // drop storage
-    drop(storage);
-
     // let config = config::MagicLocConfig {
     //     mode: config::Mode::Tag,
     //     uwb_addr: 0x0001,
@@ -132,7 +137,19 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     // config::write_config(&config).await.unwrap();
 
     // Load config from flash
-    let config = config::load_config().await.unwrap();
+    let mut config = config::load_config().await.unwrap();
+
+    if config.uwb_addr != config.network_topology.tag_addrs[0]
+        && config.enable_imu != config::ImuConfig::None
+    {
+        defmt::error!("UWB address does not match the first tag address");
+
+        // Set IMU to disabled
+        config.enable_imu = config::ImuConfig::None;
+
+        // Save the new config
+        config::write_config(&config).await.unwrap();
+    }
 
     defmt::info!("Config: {:#x}", config);
 
@@ -172,14 +189,13 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     )
     .unwrap();
 
-    let core0_spawner = INT_EXECUTOR_CORE_0.start(interrupt::Priority::Priority1);
+    let core0_spawner = INT_EXECUTOR_CORE_0.start(interrupt::Priority::Priority2);
+    let core0_spawner_p3 = INT_EXECUTOR_CORE_0_P3.start(interrupt::Priority::Priority3);
 
     // Enable the serial task
     let serial_jtag = UsbSerialJtag::new(peripherals.USB_DEVICE);
 
-    core0_spawner
-        .spawn(tasks::serial_comm_task(serial_jtag))
-        .ok();
+    spawner.spawn(tasks::serial_comm_task(serial_jtag)).ok();
 
     Timer::after_millis(10).await;
 
@@ -268,6 +284,30 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
                     ))
                     .ok();
             }
+            config::Mode::SyncTrigger => {
+                defmt::info!("Mode = Sync Trigger, starting sync trigger task");
+
+                let pcnt = hal::pcnt::PCNT::new(peripherals.PCNT);
+
+                core0_spawner_p3
+                    .spawn(tasks::sync_trigger_task(
+                        io.pins.gpio13.into_pull_down_input(),
+                        pcnt,
+                    ))
+                    .ok();
+
+                spawner
+                    .spawn(tasks::trigger_message_listener(
+                        dw3000_spi,
+                        cs_dw3000,
+                        rst_dw3000,
+                        int_dw3000,
+                        dma.channel1,
+                        clocks,
+                        config,
+                    ))
+                    .ok();
+            }
         }
 
         // Just loop to show that the main thread does not need to poll the executor.
@@ -293,10 +333,8 @@ async fn main(spawner: Spawner) -> ! {
     let clocks =
         ClockControl::configure(system.clock_control, hal::clock::CpuClock::Clock240MHz).freeze();
 
-    embassy::init(
-        &clocks,
-        hal::systimer::SystemTimer::new(peripherals.SYSTIMER),
-    );
+    let timer_group0 = hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
+    embassy::init(&clocks, timer_group0);
 
     spawner.must_spawn(startup_task(clocks));
 
