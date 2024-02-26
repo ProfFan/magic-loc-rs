@@ -99,5 +99,67 @@
             "numberOfProcessors": 2,
             "targetProcessor": 0
         },
+        {
+            // more info at: https://github.com/Marus/cortex-debug/blob/master/package.json
+            "name": "Attach 02",
+            "type": "cortex-debug",
+            "request": "attach", // launch will fail when attempting to download the app into the target
+            "cwd": "${workspaceRoot}",
+            "executable": "target/xtensa-esp32s3-none-elf/release/magic-loc-rs", //!MODIFY
+            "servertype": "openocd",
+            "interface": "jtag",
+            "toolchainPrefix": "xtensa-esp32s3-elf", //!MODIFY
+            "openOCDPreConfigLaunchCommands": [
+                "set ESP_RTOS hwthread",
+                "adapter serial DC:54:75:EF:A2:60",
+            ],
+            "serverpath": "${env:HOME}/.espressif/tools/openocd-esp32/v0.12.0-esp32-20230921/openocd-esp32/bin/openocd", //!MODIFY
+            "gdbPath": "${env:HOME}/.espressif/tools/xtensa-esp-elf-gdb/12.1_20221002/xtensa-esp-elf-gdb/bin/xtensa-esp32s3-elf-gdb", //!MODIFY
+            "armToolchainPath": "${env:HOME}/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin",
+            "configFiles": [
+                "board/esp32s3-builtin.cfg"
+            ], //!MODIFY
+            "overrideAttachCommands": [
+                "set remote hardware-watchpoint-limit 2",
+                "mon halt",
+                "flushregs"
+            ],
+            "overrideRestartCommands": [
+                "mon reset halt",
+                "flushregs",
+                "c"
+            ],
+        },
+        {
+            // more info at: https://github.com/Marus/cortex-debug/blob/master/package.json
+            "name": "Attach 03",
+            "type": "cortex-debug",
+            "request": "attach", // launch will fail when attempting to download the app into the target
+            "cwd": "${workspaceRoot}",
+            "executable": "target/xtensa-esp32s3-none-elf/release/magic-loc-rs", //!MODIFY
+            "servertype": "openocd",
+            "interface": "jtag",
+            "toolchainPrefix": "xtensa-esp32s3-elf", //!MODIFY
+            "openOCDPreConfigLaunchCommands": [
+                "set ESP_RTOS hwthread",
+                "adapter serial DC:54:75:F0:52:0C",
+            ],
+            "serverpath": "${env:HOME}/.espressif/tools/openocd-esp32/v0.12.0-esp32-20230921/openocd-esp32/bin/openocd", //!MODIFY
+            "gdbPath": "${env:HOME}/.espressif/tools/xtensa-esp-elf-gdb/12.1_20221002/xtensa-esp-elf-gdb/bin/xtensa-esp32s3-elf-gdb", //!MODIFY
+            "armToolchainPath": "${env:HOME}/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin",
+            "configFiles": [
+                "board/esp32s3-builtin.cfg"
+            ], //!MODIFY
+            "overrideAttachCommands": [
+                "set remote hardware-watchpoint-limit 2",
+                "mon halt",
+                "flushregs"
+            ],
+            "overrideRestartCommands": [
+                "mon reset halt",
+                "flushregs",
+                "c"
+            ],
+        },
     ]
 }

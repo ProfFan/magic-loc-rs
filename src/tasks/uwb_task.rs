@@ -7,15 +7,10 @@ use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Duration, Instant, Timer};
 use hal::{
     dma::ChannelCreator1,
-    dma_descriptors,
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
     prelude::*,
-    spi::{
-        master::{dma::WithDmaSpi2, Spi},
-        FullDuplexMode,
-    },
-    FlashSafeDma,
+    spi::{master::Spi, FullDuplexMode},
 };
 
 use heapless::Vec;
@@ -397,7 +392,7 @@ pub async fn uwb_task(
         let mut encoder = defmt::Encoder::new();
         let mut cursor = 0;
         let mut write_bytes = |bytes: &[u8]| {
-            data[cursor..cursor + bytes.len()].copy_from_slice(bytes);
+            data.as_mut()[cursor..cursor + bytes.len()].copy_from_slice(bytes);
             cursor += bytes.len();
         };
         encoder.start_frame(&mut write_bytes);

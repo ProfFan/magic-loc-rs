@@ -12,6 +12,8 @@ use embedded_io_async::Write;
 use esp_println::Printer;
 use hal::{interrupt, peripherals::Interrupt, usb_serial_jtag::UsbSerialJtag};
 
+use hal::macros::ram;
+
 static mut USB_SERIAL_READY: AtomicBool = AtomicBool::new(false);
 static mut USB_SERIAL_TX_BUFFER: bbqueue::BBBuffer<2048> = bbqueue::BBBuffer::new();
 static mut USB_SERIAL_TX_PRODUCER: Option<bbqueue::Producer<'static, 2048>> = None;
@@ -20,45 +22,50 @@ static mut WAKER: AtomicWaker = AtomicWaker::new();
 
 static mut ENCODER: defmt::Encoder = defmt::Encoder::new();
 static mut CS_RESTORE: RestoreState = RestoreState::invalid();
-static mut USB_SERIAL_TX_BUFFER_FULL: bool = false;
+static mut TAKEN: bool = false;
+static mut LOGGER_BUFFER: [u8; 2048] = [0; 2048];
+static mut BUFFER_CURSOR: usize = 0;
 
 #[defmt::global_logger]
 pub struct GlobalLogger;
 
 unsafe impl defmt::Logger for GlobalLogger {
+    #[ram]
     fn acquire() {
         unsafe {
             // safety: Must be paired with corresponding call to release(), see below
             let restore = critical_section::acquire();
 
+            // Compiler fence to prevent reordering of the above critical section with the
+            // subsequent access to the `TAKEN` flag.
+            core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+
+            if TAKEN {
+                panic!("defmt logger already taken!");
+            }
+
             // safety: accessing the `static mut` is OK because we have acquired a critical
             // section.
             CS_RESTORE = restore;
+
+            TAKEN = true;
         }
 
-        unsafe { USB_SERIAL_TX_BUFFER_FULL = false };
-
         if unsafe { USB_SERIAL_READY.load(core::sync::atomic::Ordering::Relaxed) } {
-            // Just push the bytes to the USB serial buffer
-            let grant = unsafe { USB_SERIAL_TX_PRODUCER.as_mut() }
-                .unwrap()
-                .grant_exact(3);
+            unsafe { LOGGER_BUFFER[0..2].copy_from_slice(&[0xFF, 0x00]) };
 
-            if let Ok(mut grant) = grant {
-                grant.buf()[0..2].copy_from_slice(&[0xFF, 0x00]);
+            let mut size_written = 2;
+            unsafe { &mut ENCODER }.start_frame(|bytes| {
+                if size_written + bytes.len() > unsafe { LOGGER_BUFFER }.len() {
+                    // Buffer overflow
+                    return;
+                }
+                unsafe { &mut LOGGER_BUFFER[size_written..size_written + bytes.len()] }
+                    .copy_from_slice(bytes);
+                size_written += bytes.len();
+            });
 
-                let mut size_written = 2;
-                unsafe { &mut ENCODER }.start_frame(|bytes| {
-                    size_written += bytes.len();
-                    grant.buf()[2..].copy_from_slice(bytes)
-                });
-
-                grant.commit(size_written);
-            } else {
-                // Do nothing if the grant failed, we'll just drop the log
-
-                unsafe { USB_SERIAL_TX_BUFFER_FULL = true };
-            }
+            unsafe { BUFFER_CURSOR = size_written };
         } else {
             // Early boot, just print to the UART
 
@@ -69,6 +76,7 @@ unsafe impl defmt::Logger for GlobalLogger {
         }
     }
 
+    #[ram]
     unsafe fn flush() {
         if unsafe { USB_SERIAL_READY.load(core::sync::atomic::Ordering::Relaxed) } {
             // Do nothing
@@ -81,25 +89,26 @@ unsafe impl defmt::Logger for GlobalLogger {
         }
     }
 
+    #[ram]
     unsafe fn release() {
         if unsafe { USB_SERIAL_READY.load(core::sync::atomic::Ordering::Relaxed) } {
-            if unsafe { USB_SERIAL_TX_BUFFER_FULL } {
-                // Do nothing
-            } else {
-                unsafe { &mut ENCODER }.end_frame(|bytes| {
-                    let grant = unsafe { &mut USB_SERIAL_TX_PRODUCER }
-                        .as_mut()
-                        .unwrap()
-                        .grant_exact(bytes.len());
+            unsafe { &mut ENCODER }.end_frame(|bytes| {
+                let cursor = unsafe { BUFFER_CURSOR };
 
-                    if let Ok(mut grant) = grant {
-                        grant.buf().copy_from_slice(bytes);
-                        grant.commit(bytes.len());
-                    } else {
-                        // Do nothing if the grant failed, we'll just drop the log
-                    }
-                });
-            }
+                if cursor + bytes.len() > unsafe { LOGGER_BUFFER }.len() {
+                    // Buffer overflow
+                    return;
+                }
+
+                unsafe { &mut LOGGER_BUFFER[cursor..cursor + bytes.len()] }.copy_from_slice(bytes);
+                unsafe { BUFFER_CURSOR += bytes.len() };
+            });
+
+            // Write to actual producer
+            let cursor = unsafe { BUFFER_CURSOR };
+            let bytes = &unsafe { LOGGER_BUFFER }[0..cursor];
+
+            let _ = write_to_usb_serial_buffer(bytes);
 
             // Wake the serial task
             unsafe { WAKER.wake() };
@@ -112,26 +121,27 @@ unsafe impl defmt::Logger for GlobalLogger {
         }
 
         unsafe {
-            critical_section::release(CS_RESTORE);
+            TAKEN = false;
 
-            CS_RESTORE = RestoreState::invalid();
+            core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+
+            critical_section::release(CS_RESTORE);
         }
     }
 
+    #[ram]
     unsafe fn write(bytes: &[u8]) {
         if unsafe { USB_SERIAL_READY.load(core::sync::atomic::Ordering::Relaxed) } {
             unsafe { &mut ENCODER }.write(bytes, |bytes| {
-                let grant = unsafe { &mut USB_SERIAL_TX_PRODUCER }
-                    .as_mut()
-                    .unwrap()
-                    .grant_exact(bytes.len());
+                let cursor = unsafe { BUFFER_CURSOR };
 
-                if let Ok(mut grant) = grant {
-                    grant.buf().copy_from_slice(bytes);
-                    grant.commit(bytes.len());
-                } else {
-                    // Do nothing if the grant failed, we'll just drop the log
+                if cursor + bytes.len() > unsafe { LOGGER_BUFFER }.len() {
+                    // Buffer overflow
+                    return;
                 }
+
+                unsafe { &mut LOGGER_BUFFER[cursor..cursor + bytes.len()] }.copy_from_slice(bytes);
+                unsafe { BUFFER_CURSOR += bytes.len() };
             });
         } else {
             // safety: accessing the `static mut` is OK because we have acquired a critical
@@ -141,6 +151,7 @@ unsafe impl defmt::Logger for GlobalLogger {
     }
 }
 
+#[inline]
 fn do_write(bytes: &[u8]) {
     Printer.write_bytes_assume_cs(bytes)
 }
@@ -148,7 +159,11 @@ fn do_write(bytes: &[u8]) {
 /// Write to the USB serial buffer
 /// We will also need to acquire the critical section when we write to the USB serial buffer
 /// to prevent interleaving with the defmt logger
+#[ram]
 pub fn write_to_usb_serial_buffer(bytes: &[u8]) -> Result<(), ()> {
+    let restore = unsafe { critical_section::acquire() };
+    core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+
     let grant = unsafe { USB_SERIAL_TX_PRODUCER.as_mut() }
         .unwrap()
         .grant_exact(bytes.len());
@@ -159,9 +174,15 @@ pub fn write_to_usb_serial_buffer(bytes: &[u8]) -> Result<(), ()> {
 
         unsafe { WAKER.wake() };
 
+        core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+        unsafe { critical_section::release(restore) };
+
         Ok(())
     } else {
         unsafe { WAKER.wake() };
+
+        core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+        unsafe { critical_section::release(restore) };
 
         Err(())
     }
@@ -169,6 +190,7 @@ pub fn write_to_usb_serial_buffer(bytes: &[u8]) -> Result<(), ()> {
 
 /// The serial task
 #[task]
+#[ram]
 pub async fn serial_comm_task(mut usb_serial: UsbSerialJtag<'static>) {
     defmt::info!("Serial Task Start!");
 

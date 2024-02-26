@@ -6,4 +6,5 @@
     "rust-analyzer.lens.references.trait.enable": true,
     "rust-analyzer.lru.capacity": 1024,
     "python.analysis.typeCheckingMode": "basic",
+    "cortex-debug.variableUseNaturalFormat": false,
 }

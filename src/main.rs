@@ -215,7 +215,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
         // IMU INT
         let int_imu = io.pins.gpio48.into_pull_down_input();
 
-        core0_spawner
+        core0_spawner_p3
             .spawn(tasks::imu_task(
                 imu_spi,
                 io.pins.gpio34.into_push_pull_output(),
@@ -333,8 +333,9 @@ async fn main(spawner: Spawner) -> ! {
     let clocks =
         ClockControl::configure(system.clock_control, hal::clock::CpuClock::Clock240MHz).freeze();
 
-    let timer_group0 = hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
-    embassy::init(&clocks, timer_group0);
+    // let timer_group0 = hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
+    let systick = hal::systimer::SystemTimer::new(peripherals.SYSTIMER);
+    embassy::init(&clocks, systick);
 
     spawner.must_spawn(startup_task(clocks));
 

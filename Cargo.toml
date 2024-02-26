@@ -24,7 +24,7 @@ hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal.git",
     "embassy",
     "embassy-executor-interrupt",
     "embassy-executor-thread",
-    "embassy-time-timg0",
+    "embassy-time-systick",
     "async",
     "defmt",
 ] }
@@ -107,7 +107,7 @@ opt-level = 3
 [profile.dev]
 lto = "thin"
 [profile.release]
-lto = "thin"
+lto = "fat"
 opt-level = 3
 debug = true
 
