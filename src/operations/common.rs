@@ -75,10 +75,6 @@ where
         let fp_index_int = fp_index >> 6;
         if fp_index_int < 730 && fp_index_int > 0 {
             defmt::warn!("FP_INDEX DETECTED AT: {}", fp_index >> 6);
-
-            rxing.force_idle().unwrap();
-            dw3000 = rxing.finish_receiving().unwrap();
-            return (dw3000, Err(()));
         }
 
         callback(&buf[..msg_length], rx_time);

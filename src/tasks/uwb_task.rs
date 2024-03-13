@@ -112,6 +112,9 @@ pub async fn uwb_task(
         .modify(|_, w| w.mindiag(0b0))
         .unwrap();
 
+    // Set IP_NTM to 20 to avoid falsely triggering on a false LOS
+    dw3000.ll().ip_conf().modify(|_, w| w.ip_ntm(20)).unwrap();
+
     Timer::after(Duration::from_millis(200)).await;
 
     // Disable SPIRDY interrupt
