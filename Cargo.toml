@@ -91,7 +91,7 @@ heapless = { version = "0.8", default-features = false, features = [
     "defmt-03",
 ] }
 embassy-executor = { version = "0.5.0", features = ["nightly"] }
-embassy-time = { version = "0.3.0", features = ["defmt", "generic-queue-8"] }
+embassy-time = { version = "0.3.0", features = ["defmt", "generic-queue-16", "tick-hz-16_000_000"] }
 embassy-futures = "*"
 embassy-sync = "*"
 embassy-embedded-hal = { version = "0.1", features = ["defmt"] }

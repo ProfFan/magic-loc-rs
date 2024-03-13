@@ -105,6 +105,13 @@ pub async fn uwb_task(
         .modify(|_, w| w.blink_tim(0x2))
         .unwrap();
 
+    // Set MINDIAG to 0
+    dw3000
+        .ll()
+        .cia_conf()
+        .modify(|_, w| w.mindiag(0b0))
+        .unwrap();
+
     Timer::after(Duration::from_millis(200)).await;
 
     // Disable SPIRDY interrupt
@@ -347,10 +354,18 @@ pub async fn uwb_task(
 
             #[allow(non_snake_case)]
             {
-                let R_a_hat = (t4 - t1).rem_euclid(1 << 40) as i128;
-                let D_a_hat = (t3 - t2).rem_euclid(1 << 40) as i128;
-                let R_b_hat = (t6 - t3).rem_euclid(1 << 40) as i128;
-                let D_b_hat = (t5 - t4).rem_euclid(1 << 40) as i128;
+                let duration_between = |t1: i64, t2: i64| {
+                    if t1 > t2 {
+                        t1 - t2 // No wrap around
+                    } else {
+                        t1 + (1 << 40) - t2 // 40-bit wrap around
+                    }
+                };
+
+                let R_a_hat = duration_between(t4, t1);
+                let D_a_hat = duration_between(t3, t2);
+                let R_b_hat = duration_between(t6, t3);
+                let D_b_hat = duration_between(t5, t4);
 
                 defmt::debug!(
                     "R_a_hat = {}, D_a_hat = {}, R_b_hat = {}, D_b_hat = {}",
@@ -364,6 +379,29 @@ pub async fn uwb_task(
                     / (R_a_hat + R_b_hat + D_a_hat + D_b_hat);
                 let tof = tof_ticks as f64 * SEC_PER_TICK;
                 let dist = tof * C_LIGHT;
+
+                // Check if the distance is valid
+                if dist < 76.5 {
+                    defmt::error!("Invalid distance: {}", dist);
+                    defmt::error!(
+                        "R_a_hat = {}, D_a_hat = {}, R_b_hat = {}, D_b_hat = {}",
+                        R_a_hat,
+                        D_a_hat,
+                        R_b_hat,
+                        D_b_hat
+                    );
+                    defmt::error!(
+                        "t1 = {}, t2 = {}, t3 = {}, t4 = {}, t5 = {}, t6 = {}",
+                        t1,
+                        t2,
+                        t3,
+                        t4,
+                        t5,
+                        t6
+                    );
+
+                    continue;
+                }
 
                 twr_results[i] = dist;
             }

@@ -132,8 +132,8 @@ pub async fn sync_trigger_task(
 
         defmt::info!(
             "Triggered, TRIGGER_TS: {:?}, LOCAL_TS: {:?}, TXTS: {:?}, SEQ: {}",
-            pcnt_time,
-            poll_time,
+            pcnt_time.as_micros(),
+            poll_time.as_micros(),
             poll_txts.value(),
             poll_seq
         );
@@ -153,29 +153,29 @@ pub async fn trigger_message_listener(
 ) {
     defmt::info!("Trigger Message Listener Start!");
 
-    let (mut dma_tx, mut dma_rx) = dma_descriptors!(32000);
+    // let (mut dma_tx, mut dma_rx) = dma_descriptors!(32000);
 
-    bus.change_bus_frequency(32u32.MHz(), &clocks);
-    let bus = bus.with_dma(dma_channel.configure(
-        false,
-        &mut dma_tx,
-        &mut dma_rx,
-        hal::dma::DmaPriority::Priority0,
-    ));
+    // bus.change_bus_frequency(32u32.MHz(), &clocks);
+    // let bus = bus.with_dma(dma_channel.configure(
+    //     false,
+    //     &mut dma_tx,
+    //     &mut dma_rx,
+    //     hal::dma::DmaPriority::Priority0,
+    // ));
 
-    // Enable DMA interrupts
-    hal::interrupt::enable(
-        hal::peripherals::Interrupt::DMA_IN_CH1,
-        hal::interrupt::Priority::Priority2,
-    )
-    .unwrap();
-    hal::interrupt::enable(
-        hal::peripherals::Interrupt::DMA_OUT_CH1,
-        hal::interrupt::Priority::Priority2,
-    )
-    .unwrap();
+    // // Enable DMA interrupts
+    // hal::interrupt::enable(
+    //     hal::peripherals::Interrupt::DMA_IN_CH1,
+    //     hal::interrupt::Priority::Priority2,
+    // )
+    // .unwrap();
+    // hal::interrupt::enable(
+    //     hal::peripherals::Interrupt::DMA_OUT_CH1,
+    //     hal::interrupt::Priority::Priority2,
+    // )
+    // .unwrap();
 
-    let bus = FlashSafeDma::<_, 32000>::new(bus);
+    // let bus = FlashSafeDma::<_, 32000>::new(bus);
 
     let bus = NoopMutex::new(RefCell::new(bus));
 

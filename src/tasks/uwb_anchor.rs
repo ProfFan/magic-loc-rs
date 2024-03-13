@@ -4,6 +4,7 @@ use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Duration, Instant, Ticker, Timer};
+
 use hal::{
     dma::ChannelCreator1,
     dma_descriptors,
@@ -201,8 +202,14 @@ pub async fn uwb_anchor_task(
             let delay_device = delay_us * 638976 / 10;
 
             // Need to wrap around full 32-bit
+            let delay_tx_time_40 = (poll_rx_ts.value() + delay_device) % (1 << 40);
             let delay_tx_time_32 =
-                (((poll_rx_ts.value() + delay_device) % (1 << 40)).div_ceil(1 << 9) << 1) as u32;
+                ((delay_tx_time_40.div_ceil(1u64 << 9) << 1) % (1u64 << 32)) as u32;
+            
+            if delay_tx_time_32 % 2 != 0 {
+                defmt::error!("Invalid delay_tx_time_32: {}", delay_tx_time_32);
+                panic!();
+            }
 
             // Send the poll packet
             dw3000 = send_poll_packet_at(

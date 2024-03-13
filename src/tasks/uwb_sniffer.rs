@@ -26,8 +26,7 @@ use zerocopy::{transmute, transmute_mut};
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 
 use crate::{
-    operations::host::{CirReport, RawCirSample},
-    util::nonblocking_wait,
+    config::MagicLocConfig, operations::host::{CirReport, RawCirSample}, util::nonblocking_wait
 };
 
 #[inline]
@@ -73,6 +72,7 @@ pub async fn uwb_sniffer(
     cs_gpio: GpioPin<Output<PushPull>, 8>,
     mut rst_gpio: GpioPin<Output<PushPull>, 9>,
     mut int_gpio: GpioPin<Input<PullDown>, 15>,
+    config: MagicLocConfig,
     dma_channel: ChannelCreator1,
 ) -> ! {
     defmt::info!("UWB Sniffer Task Start!");
@@ -104,8 +104,8 @@ pub async fn uwb_sniffer(
 
     let device = SpiDevice::new(&bus, cs_gpio);
 
-    let mut config = dw3000_ng::Config::default();
-    config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
+    let mut dw_config = dw3000_ng::Config::default();
+    dw_config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
 
     // Reset
     rst_gpio.set_low().unwrap();
@@ -121,7 +121,7 @@ pub async fn uwb_sniffer(
     let mut dw3000 = dw3000_ng::DW3000::new(device)
         .init()
         .expect("Failed init.")
-        .config(config)
+        .config(dw_config)
         .expect("Failed config.");
 
     dw3000.gpio_config(ConfigGPIOs::enable_led()).unwrap();
@@ -180,7 +180,7 @@ pub async fn uwb_sniffer(
     loop {
         defmt::trace!("Start receiving...");
 
-        let mut rxing = dw3000.receive(config).expect("Failed to receive.");
+        let mut rxing = dw3000.receive(dw_config).expect("Failed to receive.");
 
         let mut buf = [0u8; 128];
         let result = nonblocking_wait(|| rxing.r_wait_buf(&mut buf), &mut int_gpio).await;

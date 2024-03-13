@@ -117,8 +117,8 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     }
 
     // let config = config::MagicLocConfig {
-    //     mode: config::Mode::Tag,
-    //     uwb_addr: 0x0001,
+    //     mode: config::Mode::SyncTrigger,
+    //     uwb_addr: 0x2005,
     //     uwb_pan_id: 0xBEEF,
     //     enable_imu: config::ImuConfig::LSM6DSO(config::LSM6DSOConfig {
     //         odr: 0x06,
@@ -280,6 +280,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
                         cs_dw3000,
                         rst_dw3000,
                         int_dw3000,
+                        config,
                         dma.channel1,
                     ))
                     .ok();

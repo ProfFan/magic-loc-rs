@@ -42,7 +42,7 @@ pub async fn imu_task(
         hal::dma::DmaPriority::Priority0,
     ));
 
-    // let bus = FlashSafeDma::<_, 128>::new(bus);
+    let bus = FlashSafeDma::<_, 128>::new(bus);
 
     let bus = Mutex::<NoopRawMutex, _>::new(bus);
     let device = SpiDevice::new(&bus, chip_select);
@@ -100,7 +100,7 @@ pub async fn imu_task(
     // Set the accelerometer to 8g 833Hz
     imu.ll()
         .ctrl1_xl()
-        .async_modify(|_, w| w.fs_xl(3).odr_xl(7))
+        .async_modify(|_, w| w.fs_xl(0b11).odr_xl(7))
         .await
         .unwrap();
 

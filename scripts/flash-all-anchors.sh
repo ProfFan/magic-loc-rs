@@ -1,0 +1,13 @@
+#!/bin/zsh
+
+ANCHORS=(
+	"70:04:1D:CE:32:D0" # 8
+	"70:04:1D:CE:32:AC" # LEFT SIDE WALL
+	"70:04:1D:CE:87:28"
+	"70:04:1D:CE:32:E4"
+    "70:04:1D:CE:32:A0" # RIGHT SIDE WALL
+    "70:04:1D:CE:33:9C"
+    "70:04:1D:CE:20:90"
+    "70:04:1D:CE:86:A4"
+)
+
