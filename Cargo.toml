@@ -14,7 +14,7 @@ esp-wifi = { version = "0.3.0", default-features = false, features = [
     "esp-now",
     "phy-enable-usb",
 ] }
-dw3000-ng = { package = "dw3000-ng", version = "0.5", features = ["defmt"] }
+dw3000-ng = { package = "dw3000-ng", version = "0.5.1", features = ["defmt"] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
 magic-loc-protocol = { package = "magic-loc-protocol", git = "https://github.com/ProfFan/magic-loc-protocol.git", rev = "25aacb383e95125ddfbffb110beae1ff5c9a095b" }
 
