@@ -281,12 +281,14 @@ pub async fn wait_for_response<SPI>(
     dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     Option<(u16, Instant)>,
     bool,
+    u8,
 )
 where
     SPI: embedded_hal::spi::SpiDevice<u8>,
     SPI::Error: core::fmt::Debug + defmt::Format,
 {
     let mut response_received: Option<(u16, Instant)> = None;
+    let mut received_sequence_number: u8 = 0;
     let (ready, result) = super::common::listen_for_packet(
         dw3000,
         dwm_config,
@@ -322,6 +324,7 @@ where
                                 u16::from_le_bytes(src_addr.as_bytes().try_into().unwrap()),
                                 rx_ts,
                             ));
+                            received_sequence_number = frame.sequence_number().unwrap();
                         }
                     }
                 }
@@ -330,7 +333,7 @@ where
     )
     .await;
 
-    (ready, response_received, result.is_err())
+    (ready, response_received, result.is_err(), received_sequence_number)
 }
 
 /// Send the FINAL packet

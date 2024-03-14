@@ -137,6 +137,15 @@ pub async fn sync_trigger_task(
             poll_txts.value(),
             poll_seq
         );
+        
+        // JSON: {"topic": "sync", "timestamp":{"secs":0,"nanos":30353041},"data": "{\"trigger_ts\": 25038848, \"local_ts\": 25037197, \"tx_ts\": 430147772416, \"session_id\": 120}"},
+        defmt::info!(
+            "JSON: {{\"topic\": \"sync\", \"timestamp\":{{\"secs\": 0,\"nanos\": 0}},\"data\": \"{{\\\"trigger_ts\\\": {}, \\\"local_ts\\\": {}, \\\"tx_ts\\\": {}, \\\"session_id\\\": {}}}\"}}",
+            pcnt_time.as_micros(),
+            poll_time.as_micros(),
+            poll_txts.value(),
+            poll_seq
+        );
     }
 }
 

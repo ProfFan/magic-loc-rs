@@ -205,7 +205,7 @@ pub async fn uwb_anchor_task(
             let delay_tx_time_40 = (poll_rx_ts.value() + delay_device) % (1 << 40);
             let delay_tx_time_32 =
                 ((delay_tx_time_40.div_ceil(1u64 << 9) << 1) % (1u64 << 32)) as u32;
-            
+
             if delay_tx_time_32 % 2 != 0 {
                 defmt::error!("Invalid delay_tx_time_32: {}", delay_tx_time_32);
                 panic!();
@@ -254,13 +254,19 @@ pub async fn uwb_anchor_task(
 
             let rx_addr_time;
             let timed_out;
-            (dw3000, rx_addr_time, timed_out) =
+            let resp_seq_num;
+            (dw3000, rx_addr_time, timed_out, resp_seq_num) =
                 wait_for_response(dw3000, config, &node_config, &mut int_gpio, timeout_future)
                     .await;
 
             if timed_out {
                 defmt::error!("Response packet timeout!");
                 break;
+            }
+
+            if resp_seq_num != sequence_number {
+                defmt::error!("Invalid sequence number: {}", resp_seq_num);
+                continue;
             }
 
             if let Some((rx_addr, rx_time)) = rx_addr_time {
@@ -305,7 +311,11 @@ pub async fn uwb_anchor_task(
         )
         .await;
 
-        let fsm_sending_final = fsm_waiting.sending_final();
+        let mut fsm_sending_final = fsm_waiting.sending_final();
+
+        for i in 0..fsm_sending_final.response_rx_ts.len() {
+            fsm_sending_final.response_rx_ts[i] = None;
+        }
 
         fsm = fsm_sending_final.idle();
 
