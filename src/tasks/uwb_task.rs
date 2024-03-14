@@ -311,8 +311,14 @@ pub async fn uwb_task(
                 continue;
             }
 
-            let (rx_addr, packet, rx_time) = result.unwrap();
+            let (rx_addr, packet, rx_time, final_seq_num) = result.unwrap();
 
+            if final_seq_num != sequence_number {
+                // Not my frame
+                defmt::error!("Not my frame!");
+                continue;
+            }
+            
             waiting_final.set_final_tx_ts(rx_addr, packet.tx_timestamp.value().value());
             waiting_final.set_final_rx_ts(rx_addr, rx_time.value());
             waiting_final

@@ -187,7 +187,7 @@ pub async fn wait_for_final<SPI, INT, CANCEL>(
     cancel: CANCEL,
 ) -> (
     dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
-    Option<(u16, FinalPacket, Instant)>,
+    Option<(u16, FinalPacket, Instant, u8)>,
     bool,
 )
 where
@@ -196,7 +196,7 @@ where
     INT: embedded_hal_async::digital::Wait,
     CANCEL: Future,
 {
-    let mut final_received: Option<(u16, FinalPacket, Instant)> = None;
+    let mut final_received: Option<(u16, FinalPacket, Instant, u8)> = None;
     let (ready, recv_ok) = super::common::listen_for_packet(
         dw3000,
         dwm_config,
@@ -233,7 +233,12 @@ where
                                     == magic_loc_protocol::packet::PacketType::Final
                                 {
                                     defmt::debug!("Final packet received!");
-                                    final_received = Some((src_addr, *final_packet, rx_ts));
+                                    final_received = Some((
+                                        src_addr,
+                                        *final_packet,
+                                        rx_ts,
+                                        frame.sequence_number().unwrap(),
+                                    ));
                                 }
                             }
                         }
