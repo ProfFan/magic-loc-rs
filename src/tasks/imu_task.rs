@@ -35,7 +35,7 @@ pub async fn imu_task(
     let mut descriptors = [DmaDescriptor::EMPTY; 8 * 3];
     let mut rx_descriptors = [DmaDescriptor::EMPTY; 8 * 3];
 
-    let bus = bus.with_dma(dma_channel.configure(
+    let bus = bus.with_dma(dma_channel.configure_for_async(
         false,
         &mut descriptors,
         &mut rx_descriptors,
@@ -134,7 +134,7 @@ pub async fn imu_task(
     let mut ts_now = Instant::now();
     loop {
         // Wait for the interrupt
-        int1.wait_for_high().await.unwrap();
+        int1.wait_for_high().await;
 
         let mut imu_data = ImuReport::default();
 

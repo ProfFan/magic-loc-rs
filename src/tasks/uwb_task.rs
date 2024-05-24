@@ -78,11 +78,11 @@ pub async fn uwb_task(
     uwb_config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
 
     // Reset
-    rst_gpio.set_low().unwrap();
+    rst_gpio.set_low();
 
     Timer::after(Duration::from_millis(10)).await;
 
-    rst_gpio.set_high().unwrap();
+    rst_gpio.set_high();
 
     defmt::info!("DW3000 Reset!");
 

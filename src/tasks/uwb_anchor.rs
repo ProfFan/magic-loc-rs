@@ -45,7 +45,7 @@ pub async fn uwb_anchor_task(
 
     let (mut dma_tx, mut dma_rx) = dma_descriptors!(32000);
 
-    let bus = bus.with_dma(dma_channel.configure(
+    let bus = bus.with_dma(dma_channel.configure_for_async(
         false,
         &mut dma_tx,
         &mut dma_rx,
@@ -74,11 +74,11 @@ pub async fn uwb_anchor_task(
     config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
 
     // Reset
-    rst_gpio.set_low().unwrap();
+    rst_gpio.set_low();
 
     Timer::after(Duration::from_millis(10)).await;
 
-    rst_gpio.set_high().unwrap();
+    rst_gpio.set_high();
 
     defmt::info!("DW3000 Reset!");
 

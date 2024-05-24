@@ -11,6 +11,8 @@ use embassy_executor::task;
 use embassy_sync::waitqueue::AtomicWaker;
 use embedded_io_async::Write;
 use esp_println::Printer;
+use hal::peripherals::Peripherals;
+use hal::Async;
 use hal::{interrupt, peripherals::Interrupt, usb_serial_jtag::UsbSerialJtag};
 
 use hal::macros::ram;
@@ -192,8 +194,11 @@ pub fn write_to_usb_serial_buffer(bytes: &[u8]) -> Result<(), ()> {
 /// The serial task
 #[task]
 #[ram]
-pub async fn serial_comm_task(mut usb_serial: UsbSerialJtag<'static>) {
+pub async fn serial_comm_task() {
     defmt::info!("Serial Task Start!");
+
+    let peripherals = unsafe { Peripherals::steal() };
+    let mut usb_serial = UsbSerialJtag::<Async>::new_async(peripherals.USB_DEVICE);
 
     interrupt::enable(Interrupt::USB_DEVICE, interrupt::Priority::Priority1).unwrap();
 

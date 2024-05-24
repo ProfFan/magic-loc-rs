@@ -9,7 +9,7 @@ license = "Apache-2.0"
 members = ["lsm6dso"]
 
 [dependencies]
-esp-wifi = { version = "0.4.0", default-features = false, features = [
+esp-wifi = { version = "0.5.1", default-features = false, features = [
     "esp32s3",
     "esp-now",
     "phy-enable-usb",
@@ -18,9 +18,7 @@ dw3000-ng = { package = "dw3000-ng", version = "0.8.0", features = ["defmt"] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
 magic-loc-protocol = { package = "magic-loc-protocol", git = "https://github.com/ProfFan/magic-loc-protocol.git", branch = "main" }
 
-hal = { package = "esp-hal", version = "0.16.1", default-features = false, features = [
-    "rt",
-    "vectored",
+hal = { package = "esp-hal", version = "0.17.0", default-features = false, features = [
     "embassy",
     "embassy-executor-interrupt",
     "embassy-executor-thread",

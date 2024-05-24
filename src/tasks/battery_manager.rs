@@ -1,9 +1,9 @@
-use hal::{i2c::I2C, peripherals::I2C0, prelude::*};
+use hal::{i2c::I2C, peripherals::I2C0, prelude::*, Blocking};
 
 use embassy_time::{Duration, Timer};
 
 #[embassy_executor::task]
-pub async fn battery_manager(mut i2c: I2C<'static, I2C0>) {
+pub async fn battery_manager(mut i2c: I2C<'static, I2C0, Blocking>) {
     defmt::info!("BMS Task Start!");
 
     loop {

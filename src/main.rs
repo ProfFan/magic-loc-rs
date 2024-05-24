@@ -25,40 +25,20 @@ use hal::{
     clock::{ClockControl, Clocks},
     cpu_control::{CpuControl, Stack},
     dma::Dma,
-    embassy::{
-        self,
-        executor::{FromCpu1, FromCpu2, FromCpu3, InterruptExecutor},
-    },
-    gpio::{self, GpioPin},
+    embassy::{self, executor::InterruptExecutor},
+    gpio::{self, GpioPin, IO},
     i2c::I2C,
     interrupt,
     peripherals::{Interrupt, Peripherals, I2C0, SPI2},
     prelude::*,
     spi::{FullDuplexMode, SpiMode},
-    UsbSerialJtag, IO,
+    usb_serial_jtag::UsbSerialJtag,
+    Blocking,
 };
+use static_cell::StaticCell;
 
 // Stack for the second core
 static mut APP_CORE_STACK: Stack<65536> = Stack::new();
-
-static INT_EXECUTOR_CORE_0: InterruptExecutor<FromCpu1> = InterruptExecutor::new();
-static INT_EXECUTOR_CORE_1: InterruptExecutor<FromCpu2> = InterruptExecutor::new();
-static INT_EXECUTOR_CORE_0_P3: InterruptExecutor<FromCpu3> = InterruptExecutor::new();
-
-#[interrupt]
-fn FROM_CPU_INTR1() {
-    unsafe { INT_EXECUTOR_CORE_0.on_interrupt() }
-}
-
-#[interrupt]
-fn FROM_CPU_INTR2() {
-    unsafe { INT_EXECUTOR_CORE_1.on_interrupt() }
-}
-
-#[interrupt]
-fn FROM_CPU_INTR3() {
-    unsafe { INT_EXECUTOR_CORE_0_P3.on_interrupt() }
-}
 
 use crate::tasks::battery_manager;
 
@@ -78,9 +58,9 @@ fn init_heap() {
 async fn led_blinker(mut led: GpioPin<hal::gpio::Output<hal::gpio::PushPull>, 7>, id: u32) -> ! {
     loop {
         for _ in 0..id {
-            led.set_high().unwrap();
+            led.set_high();
             Timer::after(Duration::from_millis(100)).await;
-            led.set_low().unwrap();
+            led.set_low();
             Timer::after(Duration::from_millis(100)).await;
         }
         Timer::after(Duration::from_millis(1_000)).await;
@@ -153,12 +133,13 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
         .ok();
 
     // 400kHz I2C clock for the SGM41511
-    let i2c: I2C<I2C0> = hal::i2c::I2C::new(
+    let i2c: I2C<I2C0, Blocking> = hal::i2c::I2C::new(
         peripherals.I2C0,
         io.pins.gpio1,
         io.pins.gpio2,
         400u32.kHz(),
         &clocks,
+        None,
     );
 
     spawner.spawn(battery_manager(i2c)).ok();
@@ -179,13 +160,25 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     )
     .unwrap();
 
-    let core0_spawner = INT_EXECUTOR_CORE_0.start(interrupt::Priority::Priority2);
-    let core0_spawner_p3 = INT_EXECUTOR_CORE_0_P3.start(interrupt::Priority::Priority3);
+    // Interrupt executors
+    static INT_EXECUTOR_CORE_0: StaticCell<InterruptExecutor<1>> = StaticCell::new();
+    static INT_EXECUTOR_CORE_1: StaticCell<InterruptExecutor<2>> = StaticCell::new();
+    static INT_EXECUTOR_CORE_0_P3: StaticCell<InterruptExecutor<3>> = StaticCell::new();
+    let executor_core0 =
+        InterruptExecutor::new(system.software_interrupt_control.software_interrupt1);
+    let executor_core0 = INT_EXECUTOR_CORE_0.init(executor_core0);
+    let executor_core1 =
+        InterruptExecutor::new(system.software_interrupt_control.software_interrupt2);
+    let executor_core1 = INT_EXECUTOR_CORE_1.init(executor_core1);
+    let executor_core0_p3 =
+        InterruptExecutor::new(system.software_interrupt_control.software_interrupt3);
+    let executor_core0_p3 = INT_EXECUTOR_CORE_0_P3.init(executor_core0_p3);
+
+    let core0_spawner = executor_core0.start(interrupt::Priority::Priority2);
+    let core0_spawner_p3 = executor_core0_p3.start(interrupt::Priority::Priority3);
 
     // Enable the serial task
-    let serial_jtag = UsbSerialJtag::new(peripherals.USB_DEVICE);
-
-    spawner.spawn(tasks::serial_comm_task(serial_jtag)).ok();
+    spawner.spawn(tasks::serial_comm_task()).ok();
 
     Timer::after_millis(10).await;
 
@@ -230,7 +223,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
 
     let mut cpu_control = CpuControl::new(system.cpu_control);
     let cpu1_fnctn = move || {
-        let spawner = INT_EXECUTOR_CORE_1.start(interrupt::Priority::Priority1);
+        let spawner = executor_core1.start(interrupt::Priority::Priority1);
 
         match &config.mode {
             config::Mode::Anchor => {
@@ -278,12 +271,10 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
             config::Mode::SyncTrigger => {
                 defmt::info!("Mode = Sync Trigger, starting sync trigger task");
 
-                let pcnt = hal::pcnt::PCNT::new(peripherals.PCNT);
-
                 core0_spawner_p3
                     .spawn(tasks::sync_trigger_task(
                         io.pins.gpio13.into_pull_down_input(),
-                        pcnt,
+                        peripherals.PCNT,
                     ))
                     .ok();
 
@@ -349,7 +340,7 @@ async fn main(spawner: Spawner) -> ! {
         ClockControl::configure(system.clock_control, hal::clock::CpuClock::Clock240MHz).freeze();
 
     // let timer_group0 = hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
-    let systick = hal::systimer::SystemTimer::new(peripherals.SYSTIMER);
+    let systick = hal::systimer::SystemTimer::new_async(peripherals.SYSTIMER);
     embassy::init(&clocks, systick);
 
     spawner.must_spawn(startup_task(clocks));

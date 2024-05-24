@@ -16,9 +16,9 @@ use hal::{
     dma::ChannelCreator1,
     dma_descriptors,
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
-    macros::{interrupt, ram},
+    macros::{handler, ram},
     pcnt::PCNT,
-    peripherals::{Interrupt, SPI2},
+    peripherals::{self, Interrupt, SPI2},
     spi::{
         master::{dma::WithDmaSpi2, Spi},
         FullDuplexMode,
@@ -43,9 +43,11 @@ static mut MASTER_POLL_TXTS: Option<u40> = None;
 #[ram]
 pub async fn sync_trigger_task(
     mut trigger_pin: GpioPin<Input<PullDown>, 13>,
-    pcnt: PCNT<'static>,
+    pcnt: peripherals::PCNT,
 ) -> ! {
     defmt::info!("Trigger Task Start!");
+
+    let pcnt = PCNT::new(pcnt, Some(PCNT_HANDLER));
 
     let mut u0 = pcnt.get_unit(hal::pcnt::unit::Number::Unit0);
 
@@ -193,11 +195,11 @@ pub async fn trigger_message_listener(
     config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
 
     // Reset
-    rst_gpio.set_low().unwrap();
+    rst_gpio.set_low();
 
     Timer::after(Duration::from_millis(10)).await;
 
-    rst_gpio.set_high().unwrap();
+    rst_gpio.set_high();
 
     defmt::info!("DW3000 Reset!");
 
@@ -350,8 +352,8 @@ pub async fn trigger_message_listener(
     }
 }
 
-#[interrupt]
-fn PCNT() {
+#[handler]
+fn PCNT_HANDLER() {
     let mut u0 = UNIT0.try_lock().unwrap();
     let u0 = u0.get_mut().as_mut().unwrap();
 
