@@ -25,7 +25,6 @@ use hal::{
     clock::{ClockControl, Clocks},
     cpu_control::{CpuControl, Stack},
     dma::Dma,
-    efuse::{Efuse, EfuseField},
     embassy::{
         self,
         executor::{FromCpu1, FromCpu2, FromCpu3, InterruptExecutor},
@@ -117,15 +116,15 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
     }
 
     // let config = config::MagicLocConfig {
-    //     mode: config::Mode::SyncTrigger,
-    //     uwb_addr: 0x2005,
-    //     uwb_pan_id: 0xBEEF,
+    //     mode: config::Mode::TdoaAnchor,
+    //     uwb_addr: 0x3001,
+    //     uwb_pan_id: 0xDEAD,
     //     enable_imu: config::ImuConfig::LSM6DSO(config::LSM6DSOConfig {
     //         odr: 0x06,
     //         fs: 0x02,
     //     }),
     //     network_topology: config::NetworkTopology {
-    //         anchor_addrs: [0x1001, 0x1002, 0x1003, 0x1004, 0x1005, 0x1006, 0x1007, 0x1008],
+    //         anchor_addrs: [0x3001, 0x3002, 0x3003, 0x3004, 0x3005, 0x3006, 0x3007, 0x3008],
     //         tag_addrs: [0x0001, 0x0002, 0x0003],
     //     },
     //     cir_acq_options: Some(config::CirAcquisitionOptions {
@@ -136,20 +135,11 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
 
     // config::write_config(&config).await.unwrap();
 
+    // Before loading the config, delay for 1 second to allow the board to be flashed
+    Timer::after(Duration::from_secs(1)).await;
+
     // Load config from flash
-    let mut config = config::load_config().await.unwrap();
-
-    if config.uwb_addr != config.network_topology.tag_addrs[0]
-        && config.enable_imu != config::ImuConfig::None
-    {
-        defmt::error!("UWB address does not match the first tag address");
-
-        // Set IMU to disabled
-        config.enable_imu = config::ImuConfig::None;
-
-        // Save the new config
-        config::write_config(&config).await.unwrap();
-    }
+    let config = config::load_config().await.unwrap();
 
     defmt::info!("Config: {:#x}", config);
 
@@ -159,7 +149,7 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
 
     // blink the last digit of the UWB address
     spawner
-        .spawn(led_blinker(led, config.uwb_addr as u32 % 10))
+        .spawn(led_blinker(led, config.uwb_addr as u32 % 0x1000 % 10))
         .ok();
 
     // 400kHz I2C clock for the SGM41511
@@ -309,13 +299,37 @@ async fn startup_task(clocks: Clocks<'static>) -> ! {
                     ))
                     .ok();
             }
+            config::Mode::TdoaAnchor => {
+                defmt::info!("Mode = TDoA Anchor, starting TDoA anchor task");
+
+                spawner
+                    .spawn(tasks::tdoa_anchor_task(
+                        dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000, config,
+                    ))
+                    .ok();
+            }
+            config::Mode::TdoaTag => {
+                defmt::info!("Mode = TDoA Tag, starting TDoA tag task");
+
+                spawner
+                    .spawn(tasks::passive_tag_task(
+                        dw3000_spi, cs_dw3000, rst_dw3000, int_dw3000, config,
+                    ))
+                    .ok();
+            } //
+              // default => {
+              //     defmt::error!("Unsupported mode: {:?}", default);
+              // }
         }
 
         // Just loop to show that the main thread does not need to poll the executor.
         loop {}
     };
     let _guard = cpu_control
-        .start_app_core(unsafe { &mut APP_CORE_STACK }, cpu1_fnctn)
+        .start_app_core(
+            unsafe { &mut *core::ptr::addr_of_mut!(APP_CORE_STACK) },
+            cpu1_fnctn,
+        )
         .unwrap();
 
     loop {

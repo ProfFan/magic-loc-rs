@@ -54,7 +54,7 @@ where
             return (dw3000, Err(()));
         }
 
-        let (msg_length, rx_time) = result.unwrap();
+        let (msg_length, rx_time, _) = result.unwrap();
 
         // Check IP_TOAST to ensure the ToA status is good
         // TODO: Move this out of the listen_for_packet function
@@ -90,4 +90,41 @@ where
     dw3000 = rxing.finish_receiving().unwrap();
 
     (dw3000, Ok(()))
+}
+
+#[inline]
+pub async fn indirect_reg_read<SPI>(
+    dw3000: &mut dw3000_ng::DW3000<SPI, dw3000_ng::SingleBufferReceiving>,
+    reg: u8,
+    offset: u16,
+    buf: &mut [u8],
+) where
+    SPI: embedded_hal::spi::SpiDevice<u8>,
+    SPI::Error: core::fmt::Debug + defmt::Format,
+{
+    // Write the indirect address
+    dw3000
+        .ll()
+        .ptr_addr_a()
+        .write(|w| w.ptra_base(reg))
+        .unwrap();
+
+    // Write the indirect offset
+    dw3000
+        .ll()
+        .ptr_offset_a()
+        .write(|w| w.ptra_ofs(offset))
+        .unwrap();
+
+    defmt::trace!("Reading indirect data...");
+    // Read the indirect data
+    let spi = dw3000.ll().bus();
+    spi.transaction(&mut [
+        embedded_hal_async::spi::Operation::Write(&[0x1Du8 << 1]),
+        embedded_hal_async::spi::Operation::Read(&mut [0u8; 1]),
+        embedded_hal_async::spi::Operation::Read(buf),
+    ])
+    .unwrap();
+
+    defmt::trace!("Indirect data read!");
 }

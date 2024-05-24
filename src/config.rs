@@ -20,6 +20,10 @@ pub enum Mode {
     Sniffer = 2,
     /// Device is in sync trigger mode
     SyncTrigger = 3,
+    /// Device is in TDoA anchor mode
+    TdoaAnchor = 4,
+    /// Device is in TDoA tag mode
+    TdoaTag = 5,
 }
 
 #[derive(Default, Debug, Clone, Copy)]

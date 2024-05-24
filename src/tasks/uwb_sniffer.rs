@@ -26,44 +26,11 @@ use zerocopy::{transmute, transmute_mut};
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 
 use crate::{
-    config::MagicLocConfig, operations::host::{CirReport, RawCirSample}, util::nonblocking_wait
+    config::MagicLocConfig,
+    operations::common::indirect_reg_read,
+    operations::host::{CirReport, RawCirSample},
+    util::nonblocking_wait,
 };
-
-#[inline]
-async fn indirect_reg_read<SPI>(
-    dw3000: &mut dw3000_ng::DW3000<SPI, dw3000_ng::SingleBufferReceiving>,
-    reg: u8,
-    offset: u16,
-    buf: &mut [u8],
-) where
-    SPI: embedded_hal::spi::SpiDevice<u8>,
-    SPI::Error: core::fmt::Debug + defmt::Format,
-{
-    // Write the indirect address
-    dw3000
-        .ll()
-        .ptr_addr_a()
-        .write(|w| w.ptra_base(reg))
-        .unwrap();
-
-    // Write the indirect offset
-    dw3000
-        .ll()
-        .ptr_offset_a()
-        .write(|w| w.ptra_ofs(offset))
-        .unwrap();
-
-    defmt::trace!("Reading indirect data...");
-    // Read the indirect data
-    let spi = dw3000.ll().bus();
-    spi.transaction(&mut [
-        async_spi::Operation::Write(&[0x1Du8 << 1]),
-        async_spi::Operation::Read(buf),
-    ])
-    .unwrap();
-
-    defmt::trace!("Indirect data read!");
-}
 
 #[embassy_executor::task]
 #[ram]
@@ -194,7 +161,7 @@ pub async fn uwb_sniffer(
 
         defmt::trace!("Receive success!");
 
-        let (msg_length, rx_time) = result.unwrap();
+        let (msg_length, rx_time, _) = result.unwrap();
 
         const FCS_LEN: usize = 2;
         let frame = Ieee802154Frame::new_checked(&buf[..msg_length - FCS_LEN]);

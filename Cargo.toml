@@ -9,22 +9,23 @@ license = "Apache-2.0"
 members = ["lsm6dso"]
 
 [dependencies]
-esp-wifi = { version = "0.3.0", default-features = false, features = [
+esp-wifi = { version = "0.4.0", default-features = false, features = [
     "esp32s3",
     "esp-now",
     "phy-enable-usb",
 ] }
-dw3000-ng = { package = "dw3000-ng", version = "0.5.1", features = ["defmt"] }
+dw3000-ng = { package = "dw3000-ng", version = "0.8.0", features = ["defmt"] }
 lsm6dso = { package = "lsm6dso", path = "lsm6dso" }
-magic-loc-protocol = { package = "magic-loc-protocol", git = "https://github.com/ProfFan/magic-loc-protocol.git", rev = "25aacb383e95125ddfbffb110beae1ff5c9a095b" }
+magic-loc-protocol = { package = "magic-loc-protocol", git = "https://github.com/ProfFan/magic-loc-protocol.git", branch = "main" }
 
-hal = { package = "esp32s3-hal", git = "https://github.com/ProfFan/esp-hal.git", rev = "e79616960cad67ad19b32c1d228378dc93bdc799", default-features = false, features = [
+hal = { package = "esp-hal", version = "0.16.1", default-features = false, features = [
     "rt",
     "vectored",
     "embassy",
     "embassy-executor-interrupt",
     "embassy-executor-thread",
-    "embassy-time-systick",
+    "embassy-time-systick-16mhz",
+    "place-spi-driver-in-ram",
     "async",
     "defmt",
 ] }
@@ -34,7 +35,7 @@ embedded-hal = "1.0.0"
 embedded-hal-async = "1.0.0"
 embedded-hal-bus = "0.1.0"
 
-esp-backtrace = { git = "https://github.com/esp-rs/esp-backtrace", branch = "main", default-features = false, features = [
+esp-backtrace = { version = "0.11.1", default-features = false, features = [
     "esp32s3",
     "panic-handler",
     "exception-handler",
@@ -42,7 +43,7 @@ esp-backtrace = { git = "https://github.com/esp-rs/esp-backtrace", branch = "mai
     "colors",
     "halt-cores",
 ] }
-esp-println = { git = "https://github.com/esp-rs/esp-println", branch = "main", default-features = false, features = [
+esp-println = { version = "0.9.1", default-features = false, features = [
     "esp32s3",
     "log",
     # "defmt-espflash",
@@ -69,7 +70,7 @@ zerocopy-derive = "0.X"
 critical-section = { version = "1.1.2", default-features = false }
 
 # log = { version = "0.4.18" }
-defmt = { package = "defmt", version = "*", features = ["encoding-rzcobs"] }
+defmt = { package = "defmt", version = "0.3.6", features = ["encoding-rzcobs"] }
 
 esp-alloc = { version = "0.3.0" }
 smoltcp = { version = "0.11.0", default-features = false, features = [
@@ -101,6 +102,8 @@ scopeguard = { version = "^1.2.0", default-features = false }
 esp-partition-table = "~0.1"
 arbitrary-int = "^1.2"
 
+anyhow = { version = "1.0", default-features = false }
+
 [profile.dev.package.esp-storage]
 opt-level = 3
 
@@ -114,6 +117,6 @@ debug = true
 [package.metadata.espflash]
 partition_table = "partitions.csv"
 
-[patch.crates-io]
-esp-hal = { git = "https://github.com/ProfFan/esp-hal", rev = "e79616960cad67ad19b32c1d228378dc93bdc799", package = "esp-hal" }
-esp32s3-hal = { git = "https://github.com/ProfFan/esp-hal", rev = "e79616960cad67ad19b32c1d228378dc93bdc799", package = "esp32s3-hal" }
+# [patch.crates-io]
+# esp-hal = { git = "https://github.com/ProfFan/esp-hal", rev = "e79616960cad67ad19b32c1d228378dc93bdc799", package = "esp-hal" }
+# esp32s3-hal = { git = "https://github.com/ProfFan/esp-hal", rev = "e79616960cad67ad19b32c1d228378dc93bdc799", package = "esp32s3-hal" }

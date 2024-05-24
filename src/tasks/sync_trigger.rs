@@ -19,7 +19,6 @@ use hal::{
     macros::{interrupt, ram},
     pcnt::PCNT,
     peripherals::{Interrupt, SPI2},
-    prelude::_fugit_RateExtU32,
     spi::{
         master::{dma::WithDmaSpi2, Spi},
         FullDuplexMode,
@@ -137,7 +136,7 @@ pub async fn sync_trigger_task(
             poll_txts.value(),
             poll_seq
         );
-        
+
         // JSON: {"topic": "sync", "timestamp":{"secs":0,"nanos":30353041},"data": "{\"trigger_ts\": 25038848, \"local_ts\": 25037197, \"tx_ts\": 430147772416, \"session_id\": 120}"},
         defmt::info!(
             "JSON: {{\"topic\": \"sync\", \"timestamp\":{{\"secs\": 0,\"nanos\": 0}},\"data\": \"{{\\\"trigger_ts\\\": {}, \\\"local_ts\\\": {}, \\\"tx_ts\\\": {}, \\\"session_id\\\": {}}}\"}}",
@@ -285,7 +284,7 @@ pub async fn trigger_message_listener(
 
         defmt::trace!("Receive success!");
 
-        let (msg_length, rx_time) = result.unwrap();
+        let (msg_length, rx_time, _) = result.unwrap();
 
         const FCS_LEN: usize = 2;
         let frame = Ieee802154Frame::new_checked(&buf[..msg_length - FCS_LEN]);

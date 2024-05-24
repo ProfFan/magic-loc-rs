@@ -89,7 +89,7 @@ where
     )
     .await;
 
-    defmt::debug!("Current TS: {}", tx_time);
+    defmt::debug!("Delayed TX TS: {}", tx_time);
 
     match result {
         Ok(_) => {
@@ -333,7 +333,12 @@ where
     )
     .await;
 
-    (ready, response_received, result.is_err(), received_sequence_number)
+    (
+        ready,
+        response_received,
+        result.is_err(),
+        received_sequence_number,
+    )
 }
 
 /// Send the FINAL packet

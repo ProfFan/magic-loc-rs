@@ -2,6 +2,7 @@
 
 //! Serial communication module
 
+use core::ptr::addr_of_mut;
 use core::{future::poll_fn, sync::atomic::AtomicBool, task::Poll};
 
 use bbqueue::{self, GrantR};
@@ -55,7 +56,7 @@ unsafe impl defmt::Logger for GlobalLogger {
             unsafe { LOGGER_BUFFER[0..2].copy_from_slice(&[0xFF, 0x00]) };
 
             let mut size_written = 2;
-            unsafe { &mut ENCODER }.start_frame(|bytes| {
+            unsafe { &mut *addr_of_mut!(ENCODER) }.start_frame(|bytes| {
                 if size_written + bytes.len() > unsafe { LOGGER_BUFFER }.len() {
                     // Buffer overflow
                     return;
@@ -92,7 +93,7 @@ unsafe impl defmt::Logger for GlobalLogger {
     #[ram]
     unsafe fn release() {
         if unsafe { USB_SERIAL_READY.load(core::sync::atomic::Ordering::Relaxed) } {
-            unsafe { &mut ENCODER }.end_frame(|bytes| {
+            unsafe { &mut *addr_of_mut!(ENCODER) }.end_frame(|bytes| {
                 let cursor = unsafe { BUFFER_CURSOR };
 
                 if cursor + bytes.len() > unsafe { LOGGER_BUFFER }.len() {
@@ -115,7 +116,7 @@ unsafe impl defmt::Logger for GlobalLogger {
         } else {
             // safety: accessing the `static mut` is OK because we have acquired a critical
             // section.
-            unsafe { &mut ENCODER }.end_frame(do_write);
+            unsafe { &mut *addr_of_mut!(ENCODER) }.end_frame(do_write);
 
             Printer.flush();
         }
@@ -132,7 +133,7 @@ unsafe impl defmt::Logger for GlobalLogger {
     #[ram]
     unsafe fn write(bytes: &[u8]) {
         if unsafe { USB_SERIAL_READY.load(core::sync::atomic::Ordering::Relaxed) } {
-            unsafe { &mut ENCODER }.write(bytes, |bytes| {
+            unsafe { &mut *addr_of_mut!(ENCODER) }.write(bytes, |bytes| {
                 let cursor = unsafe { BUFFER_CURSOR };
 
                 if cursor + bytes.len() > unsafe { LOGGER_BUFFER }.len() {
@@ -146,7 +147,7 @@ unsafe impl defmt::Logger for GlobalLogger {
         } else {
             // safety: accessing the `static mut` is OK because we have acquired a critical
             // section.
-            unsafe { &mut ENCODER }.write(bytes, do_write);
+            unsafe { &mut *addr_of_mut!(ENCODER) }.write(bytes, do_write);
         }
     }
 }
@@ -207,7 +208,7 @@ pub async fn serial_comm_task(mut usb_serial: UsbSerialJtag<'static>) {
                 if let Ok(grant) = consumer.read() {
                     Poll::Ready(Ok(grant))
                 } else {
-                    unsafe { &WAKER }.register(cx.waker());
+                    unsafe { &*core::ptr::addr_of!(WAKER) }.register(cx.waker());
 
                     Poll::Pending
                 }

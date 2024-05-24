@@ -80,3 +80,20 @@ pub struct CirReport {
     pub cir_size: u16,
     pub cir: [RawCirSample; 16],
 }
+
+#[derive(Debug, Format, Clone, Copy)]
+#[binrw]
+#[brw(magic = b"PRN", little)]
+pub struct PrnReport {
+    pub src_addr: u16,
+    pub system_ts: u64,
+    pub seq_num: u8,
+    pub packet_txts: u64,
+    pub packet_rxts: u64,
+    pub ip_poa: u16,              // Phase of Arrival
+    pub fp_index: u16,            // First Path Index
+    pub start_index: u16,         // Start Index of CIR
+    pub carrier_freq_offset: u32, // Carrier Frequency Offset (21 bit signed, 4 integer bits, 17 fractional bits)
+    pub rx_rawst: u32,
+    pub cir: [RawCirSample; 16],
+}

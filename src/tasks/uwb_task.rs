@@ -318,7 +318,7 @@ pub async fn uwb_task(
                 defmt::error!("Not my frame!");
                 continue;
             }
-            
+
             waiting_final.set_final_tx_ts(rx_addr, packet.tx_timestamp.value().value());
             waiting_final.set_final_rx_ts(rx_addr, rx_time.value());
             waiting_final
