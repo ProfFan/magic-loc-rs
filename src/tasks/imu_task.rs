@@ -2,7 +2,6 @@ use binrw::{io::Cursor, prelude::BinWrite};
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Instant, Timer};
-use embedded_hal_async::digital::Wait;
 use hal::{
     dma::{ChannelCreator0, DmaDescriptor},
     gpio::{GpioPin, Input, Output, PullDown, PushPull},

@@ -4,6 +4,9 @@ use core::cell::RefCell;
 ///
 /// The TDoA mode does not require any RX on the anchor side
 use dw3000_ng::{self, hl::ConfigGPIOs};
+use dw3000_ng::configs::StsLen;
+use dw3000_ng::configs::StsMode::{StsMode1, StsMode2, StsModeND};
+use dw3000_ng::configs::UwbChannel::Channel9;
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Duration, Instant, Ticker, Timer};
@@ -32,7 +35,9 @@ pub async fn tdoa_anchor_task(
     let spidev = SpiDevice::new(&bus, cs_gpio);
 
     let mut dwm_config = dw3000_ng::Config::default();
-    dwm_config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
+    dwm_config.bitrate = dw3000_ng::configs::BitRate::Kbps6800;
+    dwm_config.sts_len = StsLen::StsLen128;
+    dwm_config.sts_mode = StsMode1;
 
     // Reset
     rst_gpio.set_low();
@@ -57,6 +62,9 @@ pub async fn tdoa_anchor_task(
         .led_ctrl()
         .modify(|_, w| w.blink_tim(0x2))
         .unwrap();
+
+    // Enable Super Deterministic Code (SDC)
+    dw3000.ll().sys_cfg().modify(|_, w| w.cp_sdc(0x1)).unwrap();
 
     Timer::after(Duration::from_millis(200)).await;
 

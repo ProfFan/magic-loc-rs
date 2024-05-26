@@ -10,7 +10,6 @@ use hal::{
     dma_descriptors,
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
-    prelude::*,
     spi::{
         master::{dma::WithDmaSpi2, Spi},
         FullDuplexMode,

@@ -1,6 +1,6 @@
 use core::{cell::RefCell, future::pending};
 
-use arbitrary_int::{u40, u48, Number};
+use arbitrary_int::{u40, u48};
 use binrw::io::Cursor;
 use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
@@ -29,6 +29,7 @@ use crate::{
 };
 
 use binrw::BinWrite;
+use dw3000_ng::configs::UwbChannel::Channel9;
 
 pub enum WaitForPollError<SPI: embedded_hal::spi::ErrorType> {
     WrongFrameFormat,
@@ -61,6 +62,7 @@ async fn wait_for_poll_with_cir<SPI>(
             u40,
             u8,
             [RawCirSample; 16],
+            u16,
             u16,
             u16,
             u32,
@@ -97,7 +99,7 @@ where
     let frame = Ieee802154Frame::new_checked(&buf[..msg_length - FCS_LEN]);
     let fcs = &buf[msg_length - FCS_LEN..msg_length];
 
-    match frame {
+    return match frame {
         Ok(frame) => {
             let src_addr = frame
                 .src_addr()
@@ -123,17 +125,22 @@ where
                 if packet.is_ok() {
                     // Read CIR samples around the peak
                     let ip_poa = rxing.ll().ip_ts().read().unwrap().ip_poa();
+                    let pdoa = rxing.ll().pdoa().read().unwrap().pdoa();
                     let fp_index = rxing.ll().ip_diag_8().read().unwrap().ip_fp();
                     let rx_rawst = rxing.ll().rx_rawst().read().unwrap().value();
                     let carrier_recovery_integrator =
                         rxing.ll().drx_car_int().read().unwrap().value();
+
+                    let fp_offset = fp_index >> 6; // 10.6 fixed point
+
+                    defmt::info!("CIR: ip_poa: {:#x}, pdoa: {:#x}, fp_offset: {:#x}, rx_rawst: {:#x}, carrier_recovery_integrator: {:#x}", ip_poa, pdoa, fp_offset, rx_rawst, carrier_recovery_integrator);
 
                     let mut cir_samples = [RawCirSample::default(); 16];
 
                     // Indirect read at the peak index
                     let cir_buffer: &mut [u8; 16 * 6] = transmute_mut!(&mut cir_samples);
 
-                    indirect_reg_read(&mut rxing, 0x15, fp_index - 8, &mut cir_buffer[..]).await;
+                    indirect_reg_read(&mut rxing, 0x15, fp_offset - 8, &mut cir_buffer[..]).await;
 
                     let dw3000 = rxing.finish_receiving().unwrap();
 
@@ -146,6 +153,7 @@ where
                             frame.sequence_number().unwrap(),
                             cir_samples,
                             ip_poa,
+                            pdoa,
                             fp_index,
                             carrier_recovery_integrator,
                             rx_rawst,
@@ -155,17 +163,17 @@ where
                 }
             }
 
-            return (
+            (
                 Err(WaitForPollError::WrongFrameFormat),
                 rxing.finish_receiving().unwrap(),
-            );
+            )
         }
         Err(e) => {
             defmt::error!("Failed to parse frame: {:?}", e);
-            return (
+            (
                 Err(WaitForPollError::WrongFrameFormat),
                 rxing.finish_receiving().unwrap(),
-            );
+            )
         }
     }
 }
@@ -183,7 +191,9 @@ pub async fn passive_tag_task(
     let spidev = SpiDevice::new(&bus, cs_gpio);
 
     let mut dwm_config = dw3000_ng::Config::default();
-    dwm_config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
+    dwm_config.bitrate = dw3000_ng::configs::BitRate::Kbps6800;
+    dwm_config.sts_len = dw3000_ng::configs::StsLen::StsLen128;
+    dwm_config.sts_mode = dw3000_ng::configs::StsMode::StsMode1;
 
     // Reset
     rst_gpio.set_low();
@@ -209,6 +219,15 @@ pub async fn passive_tag_task(
         .led_ctrl()
         .modify(|_, w| w.blink_tim(0x2))
         .unwrap();
+
+    // Enable Super Deterministic Code (SDC)
+    dw3000.ll().sys_cfg().modify(|_, w| w.cp_sdc(0x1)).unwrap();
+
+    // Set STS_MNTH
+    dw3000.ll().sts_conf_0().modify(|_, w| w.sts_rtm(17)).unwrap();
+
+    // Enable PDoA
+    dw3000.ll().sys_cfg().modify(|_, w| w.pdoa_mode(0x3)).unwrap();
 
     Timer::after(Duration::from_millis(200)).await;
 
@@ -261,6 +280,7 @@ pub async fn passive_tag_task(
             seq_num,
             cir,
             ip_poa,
+            pdoa,
             fp_index,
             cfo,
             rx_rawst,
@@ -276,17 +296,18 @@ pub async fn passive_tag_task(
 
         // Send the packet to the USB serial buffer
         let prn_report = PrnReport {
-            src_addr: src_addr,
+            src_addr,
             system_ts: system_ts.as_micros(),
             packet_txts: poll_packet.tx_timestamp().value(),
             packet_rxts: rxts.value(),
-            seq_num: seq_num,
-            ip_poa: ip_poa,
-            fp_index: fp_index,
-            start_index: fp_index - 8,
+            seq_num,
+            ip_poa,
+            pdoa,
+            fp_index,
+            start_index: 8,
             carrier_freq_offset: cfo,
-            rx_rawst: rx_rawst,
-            cir: cir,
+            rx_rawst,
+            cir,
         };
 
         let mut prn_buffer: [u8; 256] = [0; 256];

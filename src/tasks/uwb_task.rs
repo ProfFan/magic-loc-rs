@@ -9,7 +9,6 @@ use hal::{
     dma::ChannelCreator1,
     gpio::{GpioPin, Input, Output, PullDown, PushPull},
     peripherals::SPI2,
-    prelude::*,
     spi::{master::Spi, FullDuplexMode},
 };
 

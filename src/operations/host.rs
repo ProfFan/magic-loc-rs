@@ -91,6 +91,7 @@ pub struct PrnReport {
     pub packet_txts: u64,
     pub packet_rxts: u64,
     pub ip_poa: u16,              // Phase of Arrival
+    pub pdoa: u16,                // Phase Difference of Arrival
     pub fp_index: u16,            // First Path Index
     pub start_index: u16,         // Start Index of CIR
     pub carrier_freq_offset: u32, // Carrier Frequency Offset (21 bit signed, 4 integer bits, 17 fractional bits)

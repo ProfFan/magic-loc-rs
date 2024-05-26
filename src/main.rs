@@ -32,7 +32,6 @@ use hal::{
     peripherals::{Interrupt, Peripherals, I2C0, SPI2},
     prelude::*,
     spi::{FullDuplexMode, SpiMode},
-    usb_serial_jtag::UsbSerialJtag,
     Blocking,
 };
 use static_cell::StaticCell;

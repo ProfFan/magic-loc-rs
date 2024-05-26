@@ -10,7 +10,6 @@ use embassy_sync::{
     waitqueue::AtomicWaker,
 };
 use embassy_time::{Duration, Instant, Timer};
-use embedded_hal::digital::OutputPin;
 use hal::{
     clock::Clocks,
     dma::ChannelCreator1,
@@ -153,7 +152,7 @@ pub async fn sync_trigger_task(
 #[embassy_executor::task]
 #[ram]
 pub async fn trigger_message_listener(
-    mut bus: Spi<'static, SPI2, FullDuplexMode>,
+    bus: Spi<'static, SPI2, FullDuplexMode>,
     cs_gpio: GpioPin<Output<PushPull>, 8>,
     mut rst_gpio: GpioPin<Output<PushPull>, 9>,
     mut int_gpio: GpioPin<Input<PullDown>, 15>,
