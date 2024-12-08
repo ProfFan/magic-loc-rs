@@ -2,25 +2,23 @@ use core::cell::RefCell;
 
 use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
-use embassy_sync::blocking_mutex::NoopMutex;
+use embassy_sync::blocking_mutex::{raw::NoopRawMutex, NoopMutex};
 use embassy_time::{Duration, Instant, Ticker, Timer};
 
 use hal::{
-    dma::ChannelCreator1,
-    dma_descriptors,
-    gpio::{GpioPin, Input, Output, PullDown, PushPull},
+    dma::{ChannelCreator, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma_buffers, dma_descriptors,
+    gpio::{Input, Output},
     peripherals::SPI2,
-    spi::{
-        master::{dma::WithDmaSpi2, Spi},
-        FullDuplexMode,
-    },
-    FlashSafeDma,
+    spi::master::{Spi, SpiDmaBus},
+    Blocking,
 };
 
 use heapless::Vec;
 
 // Protocol Crate
 use magic_loc_protocol::anchor_state_machine::*;
+use static_cell::StaticCell;
 
 use crate::{
     config::MagicLocConfig,
@@ -33,39 +31,32 @@ use crate::operations::anchor::send_poll_packet;
 
 #[embassy_executor::task]
 pub async fn uwb_anchor_task(
-    bus: Spi<'static, SPI2, FullDuplexMode>,
-    cs_gpio: GpioPin<Output<PushPull>, 8>,
-    mut rst_gpio: GpioPin<Output<PushPull>, 9>,
-    mut int_gpio: GpioPin<Input<PullDown>, 15>,
+    bus: Spi<'static, Blocking, SPI2>,
+    cs_gpio: Output<'static>,
+    mut rst_gpio: Output<'static>,
+    mut int_gpio: Input<'static>,
     node_config: MagicLocConfig,
-    dma_channel: ChannelCreator1,
+    dma_channel: ChannelCreator<1>,
 ) -> ! {
     defmt::info!("UWB Anchor Task Start!");
 
-    let (mut dma_tx, mut dma_rx) = dma_descriptors!(32000);
+    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(1024);
+    let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let bus = bus.with_dma(dma_channel.configure_for_async(
-        false,
-        &mut dma_tx,
-        &mut dma_rx,
-        hal::dma::DmaPriority::Priority0,
-    ));
+    let bus = RefCell::new(
+        bus.with_dma(dma_channel.configure(false, DmaPriority::Priority0))
+            .with_buffers(dma_rx_buf, dma_tx_buf),
+    );
 
-    // Enable DMA interrupts
-    hal::interrupt::enable(
-        hal::peripherals::Interrupt::DMA_IN_CH1,
-        hal::interrupt::Priority::Priority2,
-    )
-    .unwrap();
-    hal::interrupt::enable(
-        hal::peripherals::Interrupt::DMA_OUT_CH1,
-        hal::interrupt::Priority::Priority2,
-    )
-    .unwrap();
-
-    let bus = FlashSafeDma::<_, 32000>::new(bus);
-
-    let bus = NoopMutex::new(RefCell::new(bus));
+    static BUS: StaticCell<
+        embassy_sync::blocking_mutex::Mutex<
+            NoopRawMutex,
+            RefCell<SpiDmaBus<'static, Blocking, SPI2>>,
+        >,
+    > = StaticCell::new();
+    let bus: &'static embassy_sync::blocking_mutex::Mutex<_, _> =
+        BUS.init_with(|| embassy_sync::blocking_mutex::Mutex::<NoopRawMutex, _>::new(bus));
 
     let device = SpiDevice::new(&bus, cs_gpio);
 
@@ -86,7 +77,7 @@ pub async fn uwb_anchor_task(
     let mut dw3000 = dw3000_ng::DW3000::new(device)
         .init()
         .expect("Failed init.")
-        .config(config)
+        .config(config, embassy_time::Delay)
         .expect("Failed config.");
 
     dw3000.gpio_config(ConfigGPIOs::enable_led()).unwrap();
@@ -167,6 +158,7 @@ pub async fn uwb_anchor_task(
                 &mut int_gpio,
                 300 * 1000,
                 sequence_number,
+                None,
             )
             .await;
 
@@ -255,8 +247,7 @@ pub async fn uwb_anchor_task(
             let timed_out;
             let resp_seq_num;
             (dw3000, rx_addr_time, timed_out, resp_seq_num) =
-                wait_for_response(dw3000, config, &node_config, &mut int_gpio, timeout_future)
-                    .await;
+                wait_for_response(dw3000, config, &node_config, &mut int_gpio, timeout_future).await;
 
             if timed_out {
                 defmt::error!("Response packet timeout!");
@@ -307,6 +298,7 @@ pub async fn uwb_anchor_task(
             &response_rx_ts,
             final_tx_slot,
             sequence_number,
+            None,
         )
         .await;
 

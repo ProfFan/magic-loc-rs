@@ -1,28 +1,27 @@
 // Sync trigger task
 
-use core::{cell::RefCell, future::poll_fn, sync::atomic::AtomicBool, task::Poll};
+use core::{
+    cell::{OnceCell, RefCell},
+    future::poll_fn,
+    sync::atomic::AtomicBool,
+    task::Poll,
+};
 
 use arbitrary_int::{u40, u48};
-use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_sync::{
-    blocking_mutex::{raw::CriticalSectionRawMutex, NoopMutex},
+    blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex},
     mutex::Mutex,
     waitqueue::AtomicWaker,
 };
 use embassy_time::{Duration, Instant, Timer};
 use hal::{
-    clock::Clocks,
-    dma::ChannelCreator1,
-    dma_descriptors,
-    gpio::{GpioPin, Input, Output, PullDown, PushPull},
+    dma::ChannelCreator,
+    gpio::{Input, Level, Output},
     macros::{handler, ram},
-    pcnt::PCNT,
+    pcnt::Pcnt,
     peripherals::{self, Interrupt, SPI2},
-    spi::{
-        master::{dma::WithDmaSpi2, Spi},
-        FullDuplexMode,
-    },
-    FlashSafeDma,
+    spi::master::Spi,
+    Blocking, InterruptConfigurable,
 };
 use smoltcp::wire::{Ieee802154Address, Ieee802154Frame};
 
@@ -30,7 +29,7 @@ use crate::util::nonblocking_wait;
 
 static PCNT_EVENT: AtomicBool = AtomicBool::new(false);
 static mut PCNT_TRIGGER_TIME: embassy_time::Instant = embassy_time::Instant::from_ticks(0);
-static UNIT0: Mutex<CriticalSectionRawMutex, RefCell<Option<hal::pcnt::unit::Unit>>> =
+static UNIT0: Mutex<CriticalSectionRawMutex, RefCell<Option<hal::pcnt::unit::Unit<'static, 0>>>> =
     Mutex::new(RefCell::new(None));
 static WAKER: AtomicWaker = AtomicWaker::new();
 
@@ -40,47 +39,50 @@ static mut MASTER_POLL_TXTS: Option<u40> = None;
 
 #[embassy_executor::task]
 #[ram]
-pub async fn sync_trigger_task(
-    mut trigger_pin: GpioPin<Input<PullDown>, 13>,
-    pcnt: peripherals::PCNT,
-) -> ! {
+pub async fn sync_trigger_task(trigger_pin: Input<'static>, pcnt: peripherals::PCNT) -> ! {
     defmt::info!("Trigger Task Start!");
 
-    let pcnt = PCNT::new(pcnt, Some(PCNT_HANDLER));
+    let mut pcnt = Pcnt::new(pcnt);
+    pcnt.set_interrupt_handler(PCNT_HANDLER);
 
-    let mut u0 = pcnt.get_unit(hal::pcnt::unit::Number::Unit0);
+    let u0 = pcnt.unit0;
+    u0.set_low_limit(None);
+    u0.set_high_limit(None);
+    u0.set_filter(Some(80));
+    u0.set_threshold0(Some(1));
 
-    u0.configure(hal::pcnt::unit::Config {
-        low_limit: -100,
-        high_limit: 100,
-        filter: Some(80),
-        thresh0: 1,
-        ..Default::default()
-    })
-    .unwrap();
+    let ch0 = &u0.channel0;
 
-    let mut ch0 = u0.get_channel(hal::pcnt::channel::Number::Channel0);
-
-    ch0.configure(
-        hal::pcnt::channel::PcntSource::always_high(),
-        hal::pcnt::channel::PcntSource::from_pin(&mut trigger_pin),
-        hal::pcnt::channel::Config {
-            lctrl_mode: hal::pcnt::channel::CtrlMode::Disable,
-            hctrl_mode: hal::pcnt::channel::CtrlMode::Keep,
-            pos_edge: hal::pcnt::channel::EdgeMode::Increment,
-            neg_edge: hal::pcnt::channel::EdgeMode::Hold,
-            invert_ctrl: false,
-            invert_sig: false,
-        },
+    ch0.set_ctrl_signal(Level::High);
+    ch0.set_edge_signal(trigger_pin);
+    ch0.set_ctrl_mode(
+        hal::pcnt::channel::CtrlMode::Disable,
+        hal::pcnt::channel::CtrlMode::Keep,
     );
+    ch0.set_input_mode(
+        hal::pcnt::channel::EdgeMode::Hold,
+        hal::pcnt::channel::EdgeMode::Increment,
+    );
+    // ch0.configure(
+    //     hal::pcnt::channel::PcntSource::always_high(),
+    //     hal::pcnt::channel::PcntSource::from_pin(&mut trigger_pin),
+    //     hal::pcnt::channel::Config {
+    //         lctrl_mode: hal::pcnt::channel::CtrlMode::Disable,
+    //         hctrl_mode: hal::pcnt::channel::CtrlMode::Keep,
+    //         pos_edge: hal::pcnt::channel::EdgeMode::Increment,
+    //         neg_edge: hal::pcnt::channel::EdgeMode::Hold,
+    //         invert_ctrl: false,
+    //         invert_sig: false,
+    //     },
+    // );
 
-    u0.events(hal::pcnt::unit::Events {
-        low_limit: false,
-        high_limit: false,
-        thresh0: true,
-        thresh1: false,
-        zero: false,
-    });
+    // u0.events(hal::pcnt::unit::Events {
+    //     low_limit: false,
+    //     high_limit: false,
+    //     threshold0: true,
+    //     threshold1: false,
+    //     zero: false,
+    // });
 
     u0.listen();
     u0.resume();
@@ -152,43 +154,22 @@ pub async fn sync_trigger_task(
 #[embassy_executor::task]
 #[ram]
 pub async fn trigger_message_listener(
-    bus: Spi<'static, SPI2, FullDuplexMode>,
-    cs_gpio: GpioPin<Output<PushPull>, 8>,
-    mut rst_gpio: GpioPin<Output<PushPull>, 9>,
-    mut int_gpio: GpioPin<Input<PullDown>, 15>,
-    dma_channel: ChannelCreator1,
-    clocks: Clocks<'static>,
+    bus: Spi<'static, Blocking, SPI2>,
+    mut cs_gpio: Output<'static>,
+    mut rst_gpio: Output<'static>,
+    mut int_gpio: Input<'static>,
+    dma_channel: ChannelCreator<1>,
     node_config: crate::config::MagicLocConfig,
 ) {
     defmt::info!("Trigger Message Listener Start!");
 
-    // let (mut dma_tx, mut dma_rx) = dma_descriptors!(32000);
+    let spi_bus = OnceCell::<embassy_sync::blocking_mutex::Mutex<NoopRawMutex, _>>::new();
+    let _ = spi_bus.set(embassy_sync::blocking_mutex::Mutex::new(RefCell::new(bus)));
 
-    // bus.change_bus_frequency(32u32.MHz(), &clocks);
-    // let bus = bus.with_dma(dma_channel.configure(
-    //     false,
-    //     &mut dma_tx,
-    //     &mut dma_rx,
-    //     hal::dma::DmaPriority::Priority0,
-    // ));
-
-    // // Enable DMA interrupts
-    // hal::interrupt::enable(
-    //     hal::peripherals::Interrupt::DMA_IN_CH1,
-    //     hal::interrupt::Priority::Priority2,
-    // )
-    // .unwrap();
-    // hal::interrupt::enable(
-    //     hal::peripherals::Interrupt::DMA_OUT_CH1,
-    //     hal::interrupt::Priority::Priority2,
-    // )
-    // .unwrap();
-
-    // let bus = FlashSafeDma::<_, 32000>::new(bus);
-
-    let bus = NoopMutex::new(RefCell::new(bus));
-
-    let device = SpiDevice::new(&bus, cs_gpio);
+    let spidev = embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice::new(
+        spi_bus.get().unwrap(),
+        cs_gpio,
+    );
 
     let mut config = dw3000_ng::Config::default();
     config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
@@ -204,10 +185,10 @@ pub async fn trigger_message_listener(
 
     Timer::after(Duration::from_millis(200)).await;
 
-    let mut dw3000 = dw3000_ng::DW3000::new(device)
+    let mut dw3000 = dw3000_ng::DW3000::new(spidev)
         .init()
         .expect("Failed init.")
-        .config(config)
+        .config(config, embassy_time::Delay)
         .expect("Failed config.");
 
     dw3000
@@ -356,7 +337,7 @@ fn PCNT_HANDLER() {
     let mut u0 = UNIT0.try_lock().unwrap();
     let u0 = u0.get_mut().as_mut().unwrap();
 
-    if u0.interrupt_set() {
+    if u0.interrupt_is_set() {
         u0.reset_interrupt();
     }
 

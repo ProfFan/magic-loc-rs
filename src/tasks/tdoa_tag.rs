@@ -6,12 +6,14 @@ use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Duration, Instant, Timer};
+use esp_fast_serial::write_to_usb_serial_buffer;
 use hal::{
-    dma::ChannelCreator1,
-    gpio::{GpioPin, Input, Output, PullDown, PushPull},
+    dma::ChannelCreator,
+    gpio::{GpioPin, Input, Output},
     peripherals::SPI2,
     prelude::*,
-    spi::{master::Spi, FullDuplexMode},
+    spi::master::Spi,
+    Blocking,
 };
 
 use magic_loc_protocol::packet::PollPacket;
@@ -24,7 +26,6 @@ use crate::{
         common::indirect_reg_read,
         host::{PrnReport, RawCirSample},
     },
-    tasks::write_to_usb_serial_buffer,
     util::nonblocking_wait,
 };
 
@@ -52,7 +53,7 @@ where
 async fn wait_for_poll_with_cir<SPI>(
     dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: dw3000_ng::Config,
-    int_gpio: &mut GpioPin<Input<PullDown>, 15>,
+    int_gpio: &mut Input<'static>,
 ) -> (
     Result<
         (
@@ -175,16 +176,16 @@ where
                 rxing.finish_receiving().unwrap(),
             )
         }
-    }
+    };
 }
 
 #[embassy_executor::task]
 #[ram]
 pub async fn passive_tag_task(
-    bus: Spi<'static, SPI2, FullDuplexMode>,
-    cs_gpio: GpioPin<Output<PushPull>, 8>,
-    mut rst_gpio: GpioPin<Output<PushPull>, 9>,
-    mut int_gpio: GpioPin<Input<PullDown>, 15>,
+    bus: Spi<'static, Blocking, SPI2>,
+    cs_gpio: Output<'static>,
+    mut rst_gpio: Output<'static>,
+    mut int_gpio: Input<'static>,
     config: MagicLocConfig,
 ) {
     let bus = NoopMutex::new(RefCell::new(bus));
@@ -209,7 +210,7 @@ pub async fn passive_tag_task(
     let mut dw3000 = dw3000_ng::DW3000::new(spidev)
         .init()
         .expect("Failed init.")
-        .config(dwm_config)
+        .config(dwm_config, embassy_time::Delay)
         .expect("Failed config.");
 
     dw3000.gpio_config(ConfigGPIOs::enable_led()).unwrap();
@@ -224,10 +225,18 @@ pub async fn passive_tag_task(
     dw3000.ll().sys_cfg().modify(|_, w| w.cp_sdc(0x1)).unwrap();
 
     // Set STS_MNTH
-    dw3000.ll().sts_conf_0().modify(|_, w| w.sts_rtm(17)).unwrap();
+    dw3000
+        .ll()
+        .sts_conf_0()
+        .modify(|_, w| w.sts_rtm(17))
+        .unwrap();
 
     // Enable PDoA
-    dw3000.ll().sys_cfg().modify(|_, w| w.pdoa_mode(0x3)).unwrap();
+    dw3000
+        .ll()
+        .sys_cfg()
+        .modify(|_, w| w.pdoa_mode(0x3))
+        .unwrap();
 
     Timer::after(Duration::from_millis(200)).await;
 

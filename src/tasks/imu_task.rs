@@ -2,46 +2,44 @@ use binrw::{io::Cursor, prelude::BinWrite};
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Instant, Timer};
+use esp_fast_serial::write_to_usb_serial_buffer;
 use hal::{
-    dma::{ChannelCreator0, DmaDescriptor},
-    gpio::{GpioPin, Input, Output, PullDown, PushPull},
+    dma::{ChannelCreator, DmaDescriptor, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma_buffers,
+    gpio::{GpioPin, Input, Output},
     macros::ram,
     peripherals::SPI3,
-    spi::{
-        master::{prelude::*, Spi},
-        FullDuplexMode,
-    },
-    FlashSafeDma,
+    spi::master::Spi,
+    Blocking,
 };
+
+use alloc;
 
 use lsm6dso::LSM6DSO;
 
 use crate::{
-    config::MagicLocConfig, operations::host::ImuReport, tasks::write_to_usb_serial_buffer,
+    config::MagicLocConfig, operations::host::ImuReport,
 };
 
 #[embassy_executor::task]
 #[ram]
 pub async fn imu_task(
-    bus: Spi<'static, SPI3, FullDuplexMode>,
-    chip_select: GpioPin<Output<PushPull>, 34>,
-    dma_channel: ChannelCreator0,
-    mut int1: GpioPin<Input<PullDown>, 48>,
+    bus: Spi<'static, Blocking, SPI3>,
+    chip_select: Output<'static>,
+    dma_channel: ChannelCreator<0>,
+    mut int1: Input<'static>,
     config: MagicLocConfig,
 ) -> ! {
     defmt::info!("IMU Task Start!");
 
-    let mut descriptors = [DmaDescriptor::EMPTY; 8 * 3];
-    let mut rx_descriptors = [DmaDescriptor::EMPTY; 8 * 3];
+    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(256);
+    let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let bus = bus.with_dma(dma_channel.configure_for_async(
-        false,
-        &mut descriptors,
-        &mut rx_descriptors,
-        hal::dma::DmaPriority::Priority0,
-    ));
-
-    let bus = FlashSafeDma::<_, 128>::new(bus);
+    let bus = bus
+        .with_dma(dma_channel.configure(false, DmaPriority::Priority0))
+        .with_buffers(dma_rx_buf, dma_tx_buf)
+        .into_async();
 
     let bus = Mutex::<NoopRawMutex, _>::new(bus);
     let device = SpiDevice::new(&bus, chip_select);
@@ -127,7 +125,7 @@ pub async fn imu_task(
     let _ = imu.ll().all_readouts().async_read().await.unwrap();
 
     // Enable the interrupt
-    hal::gpio::Pin::listen(&mut int1, hal::gpio::Event::HighLevel);
+    int1.listen(hal::gpio::Event::HighLevel);
 
     let mut count: i32 = 0;
     let mut ts_now = Instant::now();
@@ -163,34 +161,48 @@ pub async fn imu_task(
         count += 1;
 
         // Send the data to the host
-        let mut imu_buffer: [u8; 128] = [0; 128];
-        let mut imu_buffer_cursor = Cursor::new(&mut imu_buffer[..]);
+        // let mut imu_buffer: [u8; 128] = [0; 128];
+        // let mut imu_buffer_cursor = Cursor::new(&mut imu_buffer[..]);
 
-        imu_data.write(&mut imu_buffer_cursor).unwrap();
-        let imu_buffer_len = imu_buffer_cursor.position() as usize;
+        // imu_data.write(&mut imu_buffer_cursor).unwrap();
+        // let imu_buffer_len = imu_buffer_cursor.position() as usize;
 
-        let mut buffer = [0u8; 128];
-        let (header, data) = buffer.split_at_mut(2);
-        header.copy_from_slice(&[0xFF, 0x01]);
+        // let mut buffer = [0u8; 128];
+        // let (header, data) = buffer.split_at_mut(2);
+        // header.copy_from_slice(&[0xFF, 0x01]);
 
-        let mut encoder = defmt::Encoder::new();
-        let mut cursor = 0;
-        let mut write_bytes = |bytes: &[u8]| {
-            data[cursor..cursor + bytes.len()].copy_from_slice(bytes);
-            cursor += bytes.len();
-        };
-        encoder.start_frame(&mut write_bytes);
-        encoder.write(&imu_buffer[..imu_buffer_len], &mut write_bytes);
-        encoder.end_frame(&mut write_bytes);
+        // let mut encoder = defmt::Encoder::new();
+        // let mut cursor = 0;
+        // let mut write_bytes = |bytes: &[u8]| {
+        //     data[cursor..cursor + bytes.len()].copy_from_slice(bytes);
+        //     cursor += bytes.len();
+        // };
+        // encoder.start_frame(&mut write_bytes);
+        // encoder.write(&imu_buffer[..imu_buffer_len], &mut write_bytes);
+        // encoder.end_frame(&mut write_bytes);
 
-        let _ = write_to_usb_serial_buffer(&buffer[..cursor + 3]);
+        // let _ = write_to_usb_serial_buffer(&buffer[..cursor + 3]);
+
+        // Write a plain text message
+        let buffer = alloc::format!(
+            "[{}] IMU: G({}, {}, {}), A({}, {}, {})\n",
+            Instant::now().as_micros(),
+            imu_data.gyro[0] as i16,
+            imu_data.gyro[1] as i16,
+            imu_data.gyro[2] as i16,
+            imu_data.accel[0] as i16,
+            imu_data.accel[1] as i16,
+            imu_data.accel[2] as i16
+        );
+
+        let _ = write_to_usb_serial_buffer(buffer.as_bytes());
 
         if count == 800 {
             let ts_now_new = Instant::now();
             let ts_diff = ts_now_new - ts_now;
             ts_now = ts_now_new;
 
-            defmt::info!("IMU Freq = {}", 800_000.0 / (ts_diff.as_millis() as f32));
+            defmt::debug!("IMU Freq = {}", 800_000.0 / (ts_diff.as_millis() as f32));
 
             count = 0;
         }

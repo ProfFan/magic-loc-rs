@@ -1,21 +1,21 @@
 use core::cell::RefCell;
 
+use dw3000_ng::configs::StsLen;
+use dw3000_ng::configs::StsMode::StsMode1;
 /// TDoA Anchor
 ///
 /// The TDoA mode does not require any RX on the anchor side
 use dw3000_ng::{self, hl::ConfigGPIOs};
-use dw3000_ng::configs::StsLen;
-use dw3000_ng::configs::StsMode::{StsMode1, StsMode2, StsModeND};
-use dw3000_ng::configs::UwbChannel::Channel9;
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Duration, Instant, Ticker, Timer};
 
+use hal::Blocking;
 use hal::{
-    gpio::{GpioPin, Input, Output, PullDown, PushPull},
+    gpio::{GpioPin, Input, Output},
     peripherals::SPI2,
     prelude::*,
-    spi::{master::Spi, FullDuplexMode},
+    spi::master::Spi,
 };
 
 use crate::{config::MagicLocConfig, operations::anchor::send_poll_packet_at};
@@ -23,10 +23,10 @@ use crate::{config::MagicLocConfig, operations::anchor::send_poll_packet_at};
 #[embassy_executor::task]
 #[ram]
 pub async fn tdoa_anchor_task(
-    bus: Spi<'static, SPI2, FullDuplexMode>,
-    cs_gpio: GpioPin<Output<PushPull>, 8>,
-    mut rst_gpio: GpioPin<Output<PushPull>, 9>,
-    mut int_gpio: GpioPin<Input<PullDown>, 15>,
+    bus: Spi<'static, Blocking, SPI2>,
+    cs_gpio: Output<'static>,
+    mut rst_gpio: Output<'static>,
+    mut int_gpio: Input<'static>,
     node_config: MagicLocConfig,
 ) -> ! {
     defmt::info!("Starting TDoA Anchor task");
@@ -53,7 +53,7 @@ pub async fn tdoa_anchor_task(
     let mut dw3000 = dw3000_ng::DW3000::new(spidev)
         .init()
         .expect("Failed init.")
-        .config(dwm_config)
+        .config(dwm_config, embassy_time::Delay)
         .expect("Failed config.");
 
     dw3000.gpio_config(ConfigGPIOs::enable_led()).unwrap();

@@ -3,24 +3,22 @@ use core::cell::RefCell;
 use arbitrary_int::u48;
 use binrw::{io::Cursor, BinWrite};
 use dw3000_ng::{self, hl::ConfigGPIOs};
-use embassy_sync::blocking_mutex::NoopMutex;
+use embassy_sync::blocking_mutex::{raw::NoopRawMutex, NoopMutex};
 use embassy_time::{Duration, Instant, Timer};
 use embedded_hal_async::spi as async_spi;
 use hal::{
-    dma::ChannelCreator1,
-    dma_descriptors,
-    gpio::{GpioPin, Input, Output, PullDown, PushPull},
+    dma::{ChannelCreator, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma_buffers, dma_descriptors,
+    gpio::{Input, Output},
     peripherals::SPI2,
     prelude::*,
-    spi::{
-        master::{dma::WithDmaSpi2, Spi},
-        FullDuplexMode,
-    },
-    FlashSafeDma,
+    spi::master::{Spi, SpiDmaBus},
+    Blocking,
 };
 
 use magic_loc_protocol::packet::FinalPacket;
 use smoltcp::wire::Ieee802154Frame;
+use static_cell::StaticCell;
 use zerocopy::{transmute, transmute_mut};
 
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
@@ -35,39 +33,32 @@ use crate::{
 #[embassy_executor::task]
 #[ram]
 pub async fn uwb_sniffer(
-    bus: Spi<'static, SPI2, FullDuplexMode>,
-    cs_gpio: GpioPin<Output<PushPull>, 8>,
-    mut rst_gpio: GpioPin<Output<PushPull>, 9>,
-    mut int_gpio: GpioPin<Input<PullDown>, 15>,
+    bus: Spi<'static, Blocking, SPI2>,
+    cs_gpio: Output<'static>,
+    mut rst_gpio: Output<'static>,
+    mut int_gpio: Input<'static>,
     config: MagicLocConfig,
-    dma_channel: ChannelCreator1,
+    dma_channel: ChannelCreator<1>,
 ) -> ! {
     defmt::info!("UWB Sniffer Task Start!");
 
-    let (mut dma_tx, mut dma_rx) = dma_descriptors!(32000);
+    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(1024);
+    let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let bus = bus.with_dma(dma_channel.configure_for_async(
-        false,
-        &mut dma_tx,
-        &mut dma_rx,
-        hal::dma::DmaPriority::Priority0,
-    ));
+    let bus = RefCell::new(
+        bus.with_dma(dma_channel.configure(false, DmaPriority::Priority0))
+            .with_buffers(dma_rx_buf, dma_tx_buf),
+    );
 
-    // Enable DMA interrupts
-    hal::interrupt::enable(
-        hal::peripherals::Interrupt::DMA_IN_CH1,
-        hal::interrupt::Priority::Priority2,
-    )
-    .unwrap();
-    hal::interrupt::enable(
-        hal::peripherals::Interrupt::DMA_OUT_CH1,
-        hal::interrupt::Priority::Priority2,
-    )
-    .unwrap();
-
-    let bus = FlashSafeDma::<_, 32000>::new(bus);
-
-    let bus = NoopMutex::new(RefCell::new(bus));
+    static BUS: StaticCell<
+        embassy_sync::blocking_mutex::Mutex<
+            NoopRawMutex,
+            RefCell<SpiDmaBus<'static, Blocking, SPI2>>,
+        >,
+    > = StaticCell::new();
+    let bus: &'static embassy_sync::blocking_mutex::Mutex<_, _> =
+        BUS.init_with(|| embassy_sync::blocking_mutex::Mutex::<NoopRawMutex, _>::new(bus));
 
     let device = SpiDevice::new(&bus, cs_gpio);
 
@@ -88,7 +79,7 @@ pub async fn uwb_sniffer(
     let mut dw3000 = dw3000_ng::DW3000::new(device)
         .init()
         .expect("Failed init.")
-        .config(dw_config)
+        .config(dw_config, embassy_time::Delay)
         .expect("Failed config.");
 
     dw3000.gpio_config(ConfigGPIOs::enable_led()).unwrap();
@@ -288,7 +279,7 @@ pub async fn uwb_sniffer(
 
                     defmt::trace!("Cursor: {}", cursor);
 
-                    let result = crate::tasks::serial_comm::write_to_usb_serial_buffer(
+                    let result = esp_fast_serial::write_to_usb_serial_buffer(
                         &buffer[..cursor + 3],
                     );
 

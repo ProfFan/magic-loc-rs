@@ -5,11 +5,13 @@ use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Duration, Instant, Timer};
+use esp_fast_serial::write_to_usb_serial_buffer;
 use hal::{
-    dma::ChannelCreator1,
-    gpio::{GpioPin, Input, Output, PullDown, PushPull},
+    dma::ChannelCreator,
+    gpio::{GpioPin, Input, Output},
     peripherals::SPI2,
-    spi::{master::Spi, FullDuplexMode},
+    spi::master::Spi,
+    Blocking,
 };
 
 use heapless::Vec;
@@ -21,7 +23,6 @@ use crate::{
         host::RangeReport,
         tag::{send_response_packet_at, wait_for_final, wait_for_poll},
     },
-    tasks::write_to_usb_serial_buffer,
 };
 
 /// Task for the UWB Tag
@@ -37,12 +38,12 @@ use crate::{
 /// 6. Go back to step 1
 #[embassy_executor::task(pool_size = 2)]
 pub async fn uwb_task(
-    bus: Spi<'static, SPI2, FullDuplexMode>,
-    cs_gpio: GpioPin<Output<PushPull>, 8>,
-    mut rst_gpio: GpioPin<Output<PushPull>, 9>,
-    mut int_gpio: GpioPin<Input<PullDown>, 15>,
+    bus: Spi<'static, Blocking, SPI2>,
+    cs_gpio: Output<'static>,
+    mut rst_gpio: Output<'static>,
+    mut int_gpio: Input<'static>,
     config: MagicLocConfig,
-    dma_channel: ChannelCreator1,
+    dma_channel: ChannelCreator<1>,
 ) -> ! {
     defmt::info!("UWB Task Start!");
 
@@ -54,18 +55,6 @@ pub async fn uwb_task(
     //     &mut dma_rx,
     //     hal::dma::DmaPriority::Priority0,
     // ));
-
-    // Enable DMA interrupts
-    hal::interrupt::enable(
-        hal::peripherals::Interrupt::DMA_IN_CH1,
-        hal::interrupt::Priority::Priority2,
-    )
-    .unwrap();
-    hal::interrupt::enable(
-        hal::peripherals::Interrupt::DMA_OUT_CH1,
-        hal::interrupt::Priority::Priority2,
-    )
-    .unwrap();
 
     // let bus = FlashSafeDma::<_, 32000>::new(bus);
 
@@ -90,7 +79,7 @@ pub async fn uwb_task(
     let mut dw3000 = dw3000_ng::DW3000::new(device)
         .init()
         .expect("Failed init.")
-        .config(uwb_config)
+        .config(uwb_config, embassy_time::Delay)
         .expect("Failed config.");
 
     dw3000.gpio_config(ConfigGPIOs::enable_led()).unwrap();
@@ -112,7 +101,11 @@ pub async fn uwb_task(
         .unwrap();
 
     // Set IP_NTM to 20 to avoid falsely triggering on a false LOS
-    dw3000.ll().ip_conf().modify(|_, w| w.ip_ntm(20)).unwrap();
+    dw3000
+        .ll()
+        .ip_conf_lo()
+        .modify(|_, w| w.ip_ntm(20))
+        .unwrap();
 
     Timer::after(Duration::from_millis(200)).await;
 

@@ -2,7 +2,7 @@
 use binrw::*;
 
 use defmt::Format;
-use zerocopy_derive::{AsBytes, FromBytes, FromZeroes};
+use zerocopy_derive::{AsBytes, FromBytes, FromZeroes, IntoBytes};
 
 #[derive(Default, Debug, Format, PartialEq, Clone, Copy)]
 #[binrw]
@@ -25,7 +25,7 @@ pub struct ImuReport {
     pub gyro: [u32; 3],
 }
 
-#[derive(Default, Debug, PartialEq, Clone, Copy, AsBytes, FromZeroes, FromBytes)]
+#[derive(Default, Debug, PartialEq, Clone, Copy, IntoBytes, FromBytes)]
 #[binrw]
 #[repr(C)]
 pub struct RawCirSample {

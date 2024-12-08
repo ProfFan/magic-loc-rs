@@ -1,7 +1,10 @@
 use core::future::pending;
 
-use dw3000_ng::{self, time::Instant};
-use hal::gpio::{GpioPin, Input, PullDown};
+use dw3000_ng::{
+    self,
+    time::{Duration, Instant},
+};
+use hal::gpio::{GpioPin, Input};
 
 use arbitrary_int::{u4, u40, u48};
 
@@ -24,7 +27,7 @@ pub async fn send_poll_packet_at<SPI>(
     mut dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: &dw3000_ng::Config,
     config: &MagicLocConfig,
-    mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
+    int_gpio: &mut Input<'static>,
     at_time: u32,
     sequence_number: u8,
 ) -> dw3000_ng::DW3000<SPI, dw3000_ng::Ready>
@@ -85,7 +88,7 @@ where
             defmt::debug!("Waiting for send...");
             txing.s_wait()
         },
-        &mut int_gpio,
+        int_gpio,
     )
     .await;
 
@@ -116,9 +119,10 @@ pub async fn send_poll_packet<SPI>(
     mut dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: &dw3000_ng::Config,
     config: &MagicLocConfig,
-    mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
+    int_gpio: &mut Input<'static>,
     delay_ns: u32,
     sequence_number: u8,
+    tx_delay: Option<u16>,
 ) -> (dw3000_ng::DW3000<SPI, dw3000_ng::Ready>, Instant)
 where
     SPI: embedded_hal::spi::SpiDevice<u8>,
@@ -154,7 +158,7 @@ where
     // Send the frame
     let mac_packet_size = packet.buffer_len() + 6;
 
-    defmt::debug!("Sending frame of size: {}", mac_packet_size);
+    defmt::debug!("Sending poll frame of size: {}", mac_packet_size);
 
     let current_ts = Instant::new((dw3000.sys_time().unwrap() as u64) << 8).unwrap();
 
@@ -162,9 +166,14 @@ where
     let delay = dw3000_ng::time::Duration::from_nanos(delay_ns);
     let delayed_tx_time_unrounded = (current_ts + delay).value() % (1 << 40);
     let delayed_tx_time = Instant::new((delayed_tx_time_unrounded >> 9) << 9).unwrap();
+    let delayed_tx_time_actual = delayed_tx_time
+        + tx_delay.map_or_else(
+            || Duration::new(0).unwrap(),
+            |d| Duration::new(d as u64).unwrap(),
+        );
 
     // Set the delayed send time
-    poll_packet.set_tx_timestamp(u40::new(delayed_tx_time.value()));
+    poll_packet.set_tx_timestamp(u40::new(delayed_tx_time_actual.value()));
 
     let payload = frame.payload_mut().unwrap();
     payload[..6].copy_from_slice(&u48::from(poll_packet).to_le_bytes());
@@ -182,7 +191,7 @@ where
             defmt::debug!("Waiting for send...");
             txing.s_wait()
         },
-        &mut int_gpio,
+        int_gpio,
     )
     .await;
 
@@ -207,7 +216,7 @@ where
 
     dw3000 = txing.finish_sending().unwrap();
 
-    (dw3000, delayed_tx_time)
+    (dw3000, delayed_tx_time_actual)
 }
 
 /// Wait for the first poll packet from the first anchor to arrive
@@ -215,7 +224,7 @@ pub async fn wait_for_first_poll<SPI>(
     dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: dw3000_ng::Config,
     node_config: &MagicLocConfig,
-    mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
+    int_gpio: &mut Input<'static>,
 ) -> (
     dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     Option<Instant>,
@@ -230,7 +239,7 @@ where
     let (ready, _) = super::common::listen_for_packet(
         dw3000,
         dwm_config,
-        &mut int_gpio,
+        int_gpio,
         pending::<()>(),
         |buf, rx_ts| {
             let frame = Ieee802154Frame::new_checked(buf);
@@ -275,7 +284,7 @@ pub async fn wait_for_response<SPI>(
     dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: dw3000_ng::Config,
     node_config: &MagicLocConfig,
-    mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
+    int_gpio: &mut Input<'static>,
     cancel: impl core::future::Future,
 ) -> (
     dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
@@ -289,12 +298,8 @@ where
 {
     let mut response_received: Option<(u16, Instant)> = None;
     let mut received_sequence_number: u8 = 0;
-    let (ready, result) = super::common::listen_for_packet(
-        dw3000,
-        dwm_config,
-        &mut int_gpio,
-        cancel,
-        |buf, rx_ts| {
+    let (ready, result) =
+        super::common::listen_for_packet(dw3000, dwm_config, int_gpio, cancel, |buf, rx_ts| {
             let frame = Ieee802154Frame::new_checked(buf);
 
             if frame.is_err() {
@@ -319,7 +324,7 @@ where
                         if response_packet.packet_type()
                             == magic_loc_protocol::packet::PacketType::Response
                         {
-                            defmt::info!("Response packet received!");
+                            defmt::debug!("Response packet received!");
                             response_received = Some((
                                 u16::from_le_bytes(src_addr.as_bytes().try_into().unwrap()),
                                 rx_ts,
@@ -329,9 +334,8 @@ where
                     }
                 }
             }
-        },
-    )
-    .await;
+        })
+        .await;
 
     (
         ready,
@@ -348,10 +352,11 @@ pub async fn send_final_packet<SPI>(
     mut dw3000: dw3000_ng::DW3000<SPI, dw3000_ng::Ready>,
     dwm_config: &dw3000_ng::Config,
     config: &MagicLocConfig,
-    mut int_gpio: &mut GpioPin<Input<PullDown>, 15>,
+    int_gpio: &mut Input<'static>,
     response_rx_ts: &[Option<u64>],
     final_tx_slot: u32,
     sequence_number: u8,
+    tx_delay: Option<u16>,
 ) -> dw3000_ng::DW3000<SPI, dw3000_ng::Ready>
 where
     SPI: embedded_hal::spi::SpiDevice<u8>,
@@ -361,7 +366,11 @@ where
         magic_loc_protocol::packet::PacketType::Final,
         u4::new(0),
         core::array::from_fn(|i| u40::new(response_rx_ts[i].unwrap_or(0))),
-        u40::new((final_tx_slot as u64) << 8),
+        u40::new(
+            (dw3000_ng::time::Instant::new((final_tx_slot as u64) << 8).unwrap()
+                + dw3000_ng::time::Duration::new(tx_delay.unwrap_or(0) as u64).unwrap())
+            .value(),
+        ),
     );
 
     let mut tx_buffer = [0u8; 64];
@@ -407,7 +416,7 @@ where
             defmt::debug!("Waiting for send...");
             txing.s_wait()
         },
-        &mut int_gpio,
+        int_gpio,
     )
     .await;
 

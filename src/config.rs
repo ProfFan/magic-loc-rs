@@ -24,6 +24,8 @@ pub enum Mode {
     TdoaAnchor = 4,
     /// Device is in TDoA tag mode
     TdoaTag = 5,
+    /// Device is in TWR symmetric mode
+    SymmetricTwr = 6,
 }
 
 #[derive(Default, Debug, Clone, Copy)]

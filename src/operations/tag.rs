@@ -227,7 +227,7 @@ where
                     if let Some(payload) = frame.payload() {
                         defmt::debug!("Payload: {:#X}", payload);
                         if payload.len() >= 21 {
-                            if let Some(final_packet) = FinalPacket::ref_from(&payload[..21]) {
+                            if let Ok(final_packet) = FinalPacket::ref_from_bytes(&payload[..21]) {
                                 let header = final_packet.header();
                                 if header.packet_type()
                                     == magic_loc_protocol::packet::PacketType::Final
