@@ -1,20 +1,17 @@
 use core::future::Future;
 
+use arbitrary_int::{u4, u40, u48};
 use dw3000_ng::{self, time::Instant};
 use hal::macros::ram;
-
-use arbitrary_int::{u4, u40, u48};
-
 // Protocol Crate
 use magic_loc_protocol::packet::{FinalPacket, PacketType, ResponsePacket};
-use zerocopy::FromBytes;
-
-use crate::{config::MagicLocConfig, util::nonblocking_wait};
-
 use smoltcp::wire::{
     Ieee802154Address, Ieee802154Frame, Ieee802154FrameType, Ieee802154FrameVersion, Ieee802154Pan,
     Ieee802154Repr,
 };
+use zerocopy::FromBytes;
+
+use crate::{config::MagicLocConfig, util::nonblocking_wait};
 
 /// Wait for the poll packet from the anchor to arrive
 #[ram]

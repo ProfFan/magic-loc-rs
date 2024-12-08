@@ -4,7 +4,6 @@ use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_time::{Duration, Instant, Ticker, Timer};
-
 use hal::{
     dma::{ChannelCreator, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
@@ -13,9 +12,7 @@ use hal::{
     spi::master::{Spi, SpiDmaBus},
     Blocking,
 };
-
 use heapless::Vec;
-
 // Protocol Crate
 use magic_loc_protocol::anchor_state_machine::*;
 use static_cell::StaticCell;
@@ -23,11 +20,10 @@ use static_cell::StaticCell;
 use crate::{
     config::MagicLocConfig,
     operations::anchor::{
-        send_final_packet, send_poll_packet_at, wait_for_first_poll, wait_for_response,
+        send_final_packet, send_poll_packet, send_poll_packet_at, wait_for_first_poll,
+        wait_for_response,
     },
 };
-
-use crate::operations::anchor::send_poll_packet;
 
 #[embassy_executor::task]
 pub async fn uwb_anchor_task(
@@ -247,7 +243,8 @@ pub async fn uwb_anchor_task(
             let timed_out;
             let resp_seq_num;
             (dw3000, rx_addr_time, timed_out, resp_seq_num) =
-                wait_for_response(dw3000, config, &node_config, &mut int_gpio, timeout_future).await;
+                wait_for_response(dw3000, config, &node_config, &mut int_gpio, timeout_future)
+                    .await;
 
             if timed_out {
                 defmt::error!("Response packet timeout!");

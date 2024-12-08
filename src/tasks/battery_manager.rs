@@ -1,6 +1,5 @@
-use hal::{i2c::master::I2c, Blocking};
-
 use embassy_time::{Duration, Timer};
+use hal::{i2c::master::I2c, Blocking};
 
 #[embassy_executor::task]
 pub async fn battery_manager(mut i2c: I2c<'static, Blocking>) {

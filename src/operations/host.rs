@@ -1,6 +1,5 @@
 // Communication with the host computer
 use binrw::*;
-
 use defmt::Format;
 use zerocopy_derive::{FromBytes, IntoBytes};
 

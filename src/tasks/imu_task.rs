@@ -11,13 +11,9 @@ use hal::{
     spi::master::Spi,
     Blocking,
 };
-
-
 use lsm6dso::LSM6DSO;
 
-use crate::{
-    config::MagicLocConfig, operations::host::ImuReport,
-};
+use crate::{config::MagicLocConfig, operations::host::ImuReport};
 
 #[embassy_executor::task]
 #[ram]

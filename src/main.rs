@@ -9,32 +9,24 @@ mod util;
 
 extern crate alloc;
 use embassy_executor::Spawner;
-
-use esp_hal_embassy::InterruptExecutor;
-use esp_storage::FlashStorage;
-
-use esp_partition_table as ept;
-
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
+use esp_hal_embassy::InterruptExecutor;
+use esp_partition_table as ept;
 use esp_println as _;
-
+use esp_storage::FlashStorage;
 use esp_wifi as _;
-
 use hal as esp_hal;
-use hal::gpio::Input;
-use hal::i2c::master::I2c;
-use hal::interrupt::software::SoftwareInterruptControl;
-use hal::timer::systimer::SystemTimer;
-use hal::timer::timg::TimerGroup;
-use hal::timer::AnyTimer;
 use hal::{
     cpu_control::{CpuControl, Stack},
     dma::Dma,
-    gpio::{self, Output},
+    gpio::{self, Input, Output},
+    i2c::master::I2c,
     interrupt,
+    interrupt::software::SoftwareInterruptControl,
     peripherals::{Interrupt, Peripherals, SPI2},
     prelude::*,
+    timer::{systimer::SystemTimer, timg::TimerGroup, AnyTimer},
     Blocking,
 };
 use static_cell::StaticCell;

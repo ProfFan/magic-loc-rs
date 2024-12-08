@@ -1,7 +1,7 @@
 use core::cell::RefCell;
 
 use arbitrary_int::{u40, u48};
-use binrw::io::Cursor;
+use binrw::{io::Cursor, BinWrite};
 use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_sync::blocking_mutex::NoopMutex;
@@ -14,7 +14,6 @@ use hal::{
     spi::master::Spi,
     Blocking,
 };
-
 use magic_loc_protocol::packet::PollPacket;
 use smoltcp::wire::Ieee802154Frame;
 use zerocopy::transmute_mut;
@@ -27,8 +26,6 @@ use crate::{
     },
     util::nonblocking_wait,
 };
-
-use binrw::BinWrite;
 
 pub enum WaitForPollError<SPI: embedded_hal::spi::ErrorType> {
     WrongFrameFormat,

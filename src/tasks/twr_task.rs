@@ -13,7 +13,6 @@ use hal::{
     Blocking,
 };
 
-
 use crate::{
     config::MagicLocConfig,
     operations::{
@@ -46,7 +45,7 @@ pub async fn symmetric_twr_task(
     mut rst_gpio: Output<'static>,
     mut int_gpio: Input<'static>,
     config: MagicLocConfig,
-    dma_channel: ChannelCreator<1>,
+    _dma_channel: ChannelCreator<1>,
 ) -> ! {
     defmt::info!("Starting TWR Task");
 

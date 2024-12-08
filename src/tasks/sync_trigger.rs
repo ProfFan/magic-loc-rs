@@ -46,9 +46,9 @@ pub async fn sync_trigger_task(trigger_pin: Input<'static>, pcnt: peripherals::P
     pcnt.set_interrupt_handler(PCNT_HANDLER);
 
     let u0 = pcnt.unit0;
-    u0.set_low_limit(None);
-    u0.set_high_limit(None);
-    u0.set_filter(Some(80));
+    u0.set_low_limit(None).unwrap();
+    u0.set_high_limit(None).unwrap();
+    u0.set_filter(Some(80)).unwrap();
     u0.set_threshold0(Some(1));
 
     let ch0 = &u0.channel0;

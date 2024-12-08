@@ -1,7 +1,6 @@
 use core::cell::RefCell;
 
-use dw3000_ng::configs::StsLen;
-use dw3000_ng::configs::StsMode::StsMode1;
+use dw3000_ng::configs::{StsLen, StsMode::StsMode1};
 /// TDoA Anchor
 ///
 /// The TDoA mode does not require any RX on the anchor side
@@ -9,13 +8,12 @@ use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_sync::blocking_mutex::NoopMutex;
 use embassy_time::{Duration, Instant, Ticker, Timer};
-
-use hal::Blocking;
 use hal::{
     gpio::{Input, Output},
     peripherals::SPI2,
     prelude::*,
     spi::master::Spi,
+    Blocking,
 };
 
 use crate::{config::MagicLocConfig, operations::anchor::send_poll_packet_at};

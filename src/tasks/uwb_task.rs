@@ -13,7 +13,6 @@ use hal::{
     spi::master::Spi,
     Blocking,
 };
-
 use heapless::Vec;
 use magic_loc_protocol::tag_state_machine::TagSideStateMachine;
 
@@ -43,7 +42,7 @@ pub async fn uwb_task(
     mut rst_gpio: Output<'static>,
     mut int_gpio: Input<'static>,
     config: MagicLocConfig,
-    dma_channel: ChannelCreator<1>,
+    _dma_channel: ChannelCreator<1>,
 ) -> ! {
     defmt::info!("UWB Task Start!");
 

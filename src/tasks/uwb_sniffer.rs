@@ -3,6 +3,7 @@ use core::cell::RefCell;
 use arbitrary_int::u48;
 use binrw::{io::Cursor, BinWrite};
 use dw3000_ng::{self, hl::ConfigGPIOs};
+use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_time::{Duration, Instant, Timer};
 use hal::{
@@ -14,18 +15,17 @@ use hal::{
     spi::master::{Spi, SpiDmaBus},
     Blocking,
 };
-
 use magic_loc_protocol::packet::FinalPacket;
 use smoltcp::wire::Ieee802154Frame;
 use static_cell::StaticCell;
 use zerocopy::{transmute, transmute_mut};
 
-use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
-
 use crate::{
     config::MagicLocConfig,
-    operations::common::indirect_reg_read,
-    operations::host::{CirReport, RawCirSample},
+    operations::{
+        common::indirect_reg_read,
+        host::{CirReport, RawCirSample},
+    },
     util::nonblocking_wait,
 };
 
@@ -278,9 +278,7 @@ pub async fn uwb_sniffer(
 
                     defmt::trace!("Cursor: {}", cursor);
 
-                    let result = esp_fast_serial::write_to_usb_serial_buffer(
-                        &buffer[..cursor + 3],
-                    );
+                    let result = esp_fast_serial::write_to_usb_serial_buffer(&buffer[..cursor + 3]);
 
                     if result.is_err() {
                         Timer::after_millis(1000).await;

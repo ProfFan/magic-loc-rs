@@ -1,6 +1,5 @@
 use core::cell::{OnceCell, RefCell};
 
-use arbitrary_int::Number;
 use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_time::{Duration, Instant, Timer};
@@ -11,7 +10,6 @@ use hal::{
     spi::master::Spi,
     Blocking,
 };
-
 
 use crate::{
     config::MagicLocConfig,

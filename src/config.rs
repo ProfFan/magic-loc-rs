@@ -1,6 +1,5 @@
 use binrw::{io::Cursor, *};
 use defmt::Format;
-
 use embedded_storage::{ReadStorage, Storage};
 use esp_storage::FlashStorage;
 

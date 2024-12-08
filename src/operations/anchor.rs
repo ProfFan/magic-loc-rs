@@ -1,23 +1,20 @@
 use core::future::pending;
 
+use arbitrary_int::{u4, u40, u48};
 use dw3000_ng::{
     self,
     time::{Duration, Instant},
 };
 use hal::gpio::Input;
-
-use arbitrary_int::{u4, u40, u48};
-
 // Protocol Crate
 use magic_loc_protocol::packet::PollPacket;
-use zerocopy::transmute;
-
-use crate::{config::MagicLocConfig, util::nonblocking_wait};
-
 use smoltcp::wire::{
     Ieee802154Address, Ieee802154Frame, Ieee802154FrameType, Ieee802154FrameVersion, Ieee802154Pan,
     Ieee802154Repr,
 };
+use zerocopy::transmute;
+
+use crate::{config::MagicLocConfig, util::nonblocking_wait};
 
 /// Send a poll packet at a specific device time (in 32-bit ticks)
 ///
