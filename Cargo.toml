@@ -5,6 +5,12 @@ authors = ["Fan Jiang <i@fanjiang.me>"]
 edition = "2021"
 license = "Apache-2.0"
 
+[[bin]]
+name = "magic-loc-rs"
+test = false
+doctest = false
+bench = false
+
 [workspace]
 members = ["lsm6dso"]
 

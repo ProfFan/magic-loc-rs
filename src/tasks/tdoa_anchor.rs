@@ -12,7 +12,7 @@ use embassy_time::{Duration, Instant, Ticker, Timer};
 
 use hal::Blocking;
 use hal::{
-    gpio::{GpioPin, Input, Output},
+    gpio::{Input, Output},
     peripherals::SPI2,
     prelude::*,
     spi::master::Spi,

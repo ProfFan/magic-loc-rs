@@ -1,19 +1,17 @@
-use binrw::{io::Cursor, prelude::BinWrite};
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Instant, Timer};
 use esp_fast_serial::write_to_usb_serial_buffer;
 use hal::{
-    dma::{ChannelCreator, DmaDescriptor, DmaPriority, DmaRxBuf, DmaTxBuf},
+    dma::{ChannelCreator, DmaPriority, DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{GpioPin, Input, Output},
+    gpio::{Input, Output},
     macros::ram,
     peripherals::SPI3,
     spi::master::Spi,
     Blocking,
 };
 
-use alloc;
 
 use lsm6dso::LSM6DSO;
 

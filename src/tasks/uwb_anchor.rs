@@ -2,12 +2,12 @@ use core::cell::RefCell;
 
 use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
-use embassy_sync::blocking_mutex::{raw::NoopRawMutex, NoopMutex};
+use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_time::{Duration, Instant, Ticker, Timer};
 
 use hal::{
     dma::{ChannelCreator, DmaPriority, DmaRxBuf, DmaTxBuf},
-    dma_buffers, dma_descriptors,
+    dma_buffers,
     gpio::{Input, Output},
     peripherals::SPI2,
     spi::master::{Spi, SpiDmaBus},
@@ -58,7 +58,7 @@ pub async fn uwb_anchor_task(
     let bus: &'static embassy_sync::blocking_mutex::Mutex<_, _> =
         BUS.init_with(|| embassy_sync::blocking_mutex::Mutex::<NoopRawMutex, _>::new(bus));
 
-    let device = SpiDevice::new(&bus, cs_gpio);
+    let device = SpiDevice::new(bus, cs_gpio);
 
     let mut config = dw3000_ng::Config::default();
     config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
@@ -219,7 +219,7 @@ pub async fn uwb_anchor_task(
                 * (node_config.network_topology.anchor_addrs.len() - my_index
                     + node_config.network_topology.tag_addrs.len()) as u64;
             response_recv_deadline =
-                Instant::now() + Duration::from_micros(response_expected_time_us as u64);
+                Instant::now() + Duration::from_micros(response_expected_time_us);
 
             // We use this because this would be more accurate than using our tx time
             let response_expected_period = 1000

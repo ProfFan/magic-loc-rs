@@ -2,7 +2,7 @@
 use binrw::*;
 
 use defmt::Format;
-use zerocopy_derive::{AsBytes, FromBytes, FromZeroes, IntoBytes};
+use zerocopy_derive::{FromBytes, IntoBytes};
 
 #[derive(Default, Debug, Format, PartialEq, Clone, Copy)]
 #[binrw]

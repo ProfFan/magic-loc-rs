@@ -1,4 +1,4 @@
-use core::{cell::RefCell, future::pending};
+use core::cell::RefCell;
 
 use binrw::io::Cursor;
 use dw3000_ng::{self, hl::ConfigGPIOs};
@@ -8,7 +8,7 @@ use embassy_time::{Duration, Instant, Timer};
 use esp_fast_serial::write_to_usb_serial_buffer;
 use hal::{
     dma::ChannelCreator,
-    gpio::{GpioPin, Input, Output},
+    gpio::{Input, Output},
     peripherals::SPI2,
     spi::master::Spi,
     Blocking,
@@ -431,7 +431,7 @@ pub async fn uwb_task(
         let mut encoder = defmt::Encoder::new();
         let mut cursor = 0;
         let mut write_bytes = |bytes: &[u8]| {
-            data.as_mut()[cursor..cursor + bytes.len()].copy_from_slice(bytes);
+            data[cursor..cursor + bytes.len()].copy_from_slice(bytes);
             cursor += bytes.len();
         };
         encoder.start_frame(&mut write_bytes);

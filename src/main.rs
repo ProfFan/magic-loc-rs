@@ -33,9 +33,8 @@ use hal::{
     dma::Dma,
     gpio::{self, Output},
     interrupt,
-    peripherals::{Interrupt, Peripherals, I2C0, SPI2},
+    peripherals::{Interrupt, Peripherals, SPI2},
     prelude::*,
-    spi::SpiMode,
     Blocking,
 };
 use static_cell::StaticCell;

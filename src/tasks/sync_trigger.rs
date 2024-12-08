@@ -155,7 +155,7 @@ pub async fn sync_trigger_task(trigger_pin: Input<'static>, pcnt: peripherals::P
 #[ram]
 pub async fn trigger_message_listener(
     bus: Spi<'static, Blocking, SPI2>,
-    mut cs_gpio: Output<'static>,
+    cs_gpio: Output<'static>,
     mut rst_gpio: Output<'static>,
     mut int_gpio: Input<'static>,
     dma_channel: ChannelCreator<1>,

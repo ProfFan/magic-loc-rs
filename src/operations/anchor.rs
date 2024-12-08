@@ -4,7 +4,7 @@ use dw3000_ng::{
     self,
     time::{Duration, Instant},
 };
-use hal::gpio::{GpioPin, Input};
+use hal::gpio::Input;
 
 use arbitrary_int::{u4, u40, u48};
 

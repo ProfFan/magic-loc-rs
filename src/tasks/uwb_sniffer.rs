@@ -3,12 +3,11 @@ use core::cell::RefCell;
 use arbitrary_int::u48;
 use binrw::{io::Cursor, BinWrite};
 use dw3000_ng::{self, hl::ConfigGPIOs};
-use embassy_sync::blocking_mutex::{raw::NoopRawMutex, NoopMutex};
+use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_time::{Duration, Instant, Timer};
-use embedded_hal_async::spi as async_spi;
 use hal::{
     dma::{ChannelCreator, DmaPriority, DmaRxBuf, DmaTxBuf},
-    dma_buffers, dma_descriptors,
+    dma_buffers,
     gpio::{Input, Output},
     peripherals::SPI2,
     prelude::*,
@@ -60,7 +59,7 @@ pub async fn uwb_sniffer(
     let bus: &'static embassy_sync::blocking_mutex::Mutex<_, _> =
         BUS.init_with(|| embassy_sync::blocking_mutex::Mutex::<NoopRawMutex, _>::new(bus));
 
-    let device = SpiDevice::new(&bus, cs_gpio);
+    let device = SpiDevice::new(bus, cs_gpio);
 
     let mut dw_config = dw3000_ng::Config::default();
     dw_config.bitrate = dw3000_ng::configs::BitRate::Kbps850;
@@ -224,8 +223,8 @@ pub async fn uwb_sniffer(
                     src_addr: u16::from_le_bytes(src_addr.as_bytes().try_into().unwrap()),
                     system_ts: Instant::now().as_micros(),
                     seq_num: frame.sequence_number().unwrap_or(0),
-                    fp_index: fp_index,
-                    ip_poa: ip_poa,
+                    fp_index,
+                    ip_poa,
                     start_index: fp_index - 10,
                     cir_size: 16,
                     cir: [RawCirSample {
@@ -267,7 +266,7 @@ pub async fn uwb_sniffer(
                     let mut encoder = defmt::Encoder::new();
                     let mut cursor = 0;
                     let mut write_bytes = |bytes: &[u8]| {
-                        data.as_mut()[cursor..cursor + bytes.len()].copy_from_slice(bytes);
+                        data[cursor..cursor + bytes.len()].copy_from_slice(bytes);
                         cursor += bytes.len();
                     };
 

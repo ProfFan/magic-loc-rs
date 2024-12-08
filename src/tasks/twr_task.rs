@@ -1,6 +1,5 @@
-use core::{cell::RefCell, future::pending};
+use core::cell::RefCell;
 
-use binrw::io::Cursor;
 use dw3000_ng::{self, hl::ConfigGPIOs};
 use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_sync::blocking_mutex::NoopMutex;
@@ -14,15 +13,12 @@ use hal::{
     Blocking,
 };
 
-use heapless::Vec;
-use magic_loc_protocol::tag_state_machine::TagSideStateMachine;
 
 use crate::{
     config::MagicLocConfig,
     operations::{
         anchor::{send_final_packet, send_poll_packet, wait_for_response},
-        host::RangeReport,
-        tag::{send_response_packet_at, wait_for_final, wait_for_poll},
+        tag::wait_for_final,
     },
 };
 
@@ -145,7 +141,7 @@ pub async fn symmetric_twr_task(
 
     defmt::info!("DW3000 Initialized!");
 
-    let mut sequence_number = 0;
+    let sequence_number = 0;
 
     loop {
         // Send a Poll packet

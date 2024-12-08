@@ -1,30 +1,22 @@
-use core::{
-    cell::{OnceCell, RefCell},
-    future::{self, pending},
-};
+use core::cell::{OnceCell, RefCell};
 
 use arbitrary_int::Number;
-use binrw::io::Cursor;
 use dw3000_ng::{self, hl::ConfigGPIOs};
-use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
-use embassy_sync::blocking_mutex::{raw::NoopRawMutex, NoopMutex};
+use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_time::{Duration, Instant, Timer};
 use esp_fast_serial::write_to_usb_serial_buffer;
 use hal::{
-    gpio::{GpioPin, Input, Output},
+    gpio::{Input, Output},
     peripherals::SPI2,
     spi::master::Spi,
     Blocking,
 };
 
-use heapless::Vec;
-use magic_loc_protocol::tag_state_machine::TagSideStateMachine;
 
 use crate::{
     config::MagicLocConfig,
     operations::{
-        anchor::{send_final_packet, send_poll_packet, wait_for_response},
-        host::RangeReport,
+        anchor::send_final_packet,
         tag::{send_response_packet_at, wait_for_final, wait_for_poll},
     },
 };
@@ -152,7 +144,7 @@ pub async fn symmetric_twr_anchor_task(
 
     defmt::info!("DW3000 Initialized!");
 
-    let mut sequence_number = 0;
+    let sequence_number = 0;
 
     loop {
         // Wait for the Poll packet

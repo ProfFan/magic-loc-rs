@@ -1,4 +1,4 @@
-use hal::{i2c::master::I2c, peripherals::I2C0, Blocking};
+use hal::{i2c::master::I2c, Blocking};
 
 use embassy_time::{Duration, Timer};
 
